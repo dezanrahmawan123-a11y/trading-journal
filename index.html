@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Jurnal Trading</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ===================== AUTH SCREEN ===================== -->
+  <div id="auth-shell" class="auth-shell">
+    <div class="auth-card">
+      <div class="wordmark">JURNAL // TRADING</div>
+      <h1 id="auth-title">Masuk ke akun</h1>
+      <p class="sub" id="auth-sub">Catat & analisa trade lo di satu tempat.</p>
+
+      <div id="auth-error" class="error-msg hidden"></div>
+
+      <form id="auth-form">
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="auth-email" required placeholder="kamu@email.com" />
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="auth-password" required placeholder="Minimal 6 karakter" />
+        </div>
+        <button type="submit" class="btn btn-primary" id="auth-submit-btn">Masuk</button>
+      </form>
+
+      <div class="auth-toggle">
+        <span id="auth-toggle-text">Belum punya akun?</span>
+        <button id="auth-toggle-btn">Daftar sekarang</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== APP SCREEN ===================== -->
+  <div id="app-shell" class="app-shell hidden">
+    <div class="topbar">
+      <div class="wordmark">JURNAL // TRADING</div>
+      <div class="topbar-right">
+        <select id="account-switcher"></select>
+        <span class="user-email" id="user-email"></span>
+        <button class="btn btn-ghost" id="logout-btn">Keluar</button>
+      </div>
+    </div>
+
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+      <button class="tab-btn" data-tab="tradelog">Trade Log</button>
+      <button class="tab-btn" data-tab="analytics">Analytics</button>
+    </nav>
+
+    <main>
+
+      <!-- ============ DASHBOARD TAB ============ -->
+      <section id="tab-dashboard" class="tab-content">
+        <div class="dash-row">
+          <div class="panel calendar-panel">
+            <div class="panel-header">
+              <div>
+                <h3>Monthly Performance</h3>
+                <span class="panel-sub" id="cal-subtitle">0 trade</span>
+              </div>
+              <div class="month-nav">
+                <button type="button" id="cal-prev">‹</button>
+                <span id="cal-month-label">-</span>
+                <button type="button" id="cal-next">›</button>
+              </div>
+            </div>
+            <div class="calendar-weekdays">
+              <span>Sen</span><span>Sel</span><span>Rab</span><span>Kam</span><span>Jum</span><span>Sab</span><span>Min</span>
+            </div>
+            <div class="calendar-grid" id="calendar-grid"></div>
+          </div>
+
+          <div class="panel recent-panel">
+            <div class="panel-header">
+              <div>
+                <h3>Recent Trades</h3>
+                <span class="panel-sub">Terbaru dari semua waktu</span>
+              </div>
+            </div>
+            <div id="recent-trades-list" class="recent-list"></div>
+          </div>
+        </div>
+
+        <div class="stats-row" id="dashboard-stats-row">
+          <div class="stat-card">
+            <div class="stat-label" id="dash-winrate-sub">WIN RATE · -</div>
+            <div class="stat-value neu" id="dash-winrate">0%</div>
+            <div class="mini-badges">
+              <span class="mini-badge mini-win"><b id="dash-w-count">0</b>W</span>
+              <span class="mini-badge mini-loss"><b id="dash-l-count">0</b>L</span>
+              <span class="mini-badge mini-be"><b id="dash-be-count">0</b>BE</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label" id="dash-pnl-sub">P&L BULAN INI · -</div>
+            <div class="stat-value neu" id="dash-pnl">$0.00</div>
+            <div class="breakdown-line">
+              <span>Profit</span><span class="pos" id="dash-profit">$0.00</span>
+            </div>
+            <div class="breakdown-line">
+              <span>Loss</span><span class="neg" id="dash-loss">$0.00</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label" id="dash-rr-sub">AVG RISK:REWARD · -</div>
+            <div class="stat-value neu" id="dash-rr">-</div>
+            <div class="stat-footnote" id="dash-rr-footnote">0 trade bulan ini</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label" id="dash-balance-sub">SALDO AKUN</div>
+            <div class="stat-value neu" id="dash-balance">$0.00</div>
+            <div class="stat-footnote" id="dash-balance-footnote">Modal awal: $0.00</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ TRADE LOG TAB ============ -->
+      <section id="tab-tradelog" class="tab-content hidden">
+
+        <div class="tradelog-header">
+          <h2>Trade Journal</h2>
+          <button type="button" class="btn btn-toggle-form" id="toggle-form-btn">+ New Trade</button>
+        </div>
+
+        <div class="stats-row" id="tradelog-stats-row">
+          <div class="stat-card">
+            <div class="stat-label">TOTAL P&L</div>
+            <div class="stat-value neu" id="tl-total-pnl">$0.00</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">WIN RATE</div>
+            <div class="stat-value neu" id="tl-winrate">0%</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">TRADES</div>
+            <div class="stat-value neu" id="tl-trades">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">BALANCE</div>
+            <div class="stat-value neu" id="tl-balance">$0.00</div>
+          </div>
+        </div>
+
+        <!-- ===== INLINE TRADE FORM ===== -->
+        <div class="trade-form-panel hidden" id="trade-form-panel">
+          <div class="trade-form-title">📝 <span id="trade-form-title-text">New Trade Entry</span></div>
+
+          <div id="trade-form-error" class="error-msg hidden"></div>
+
+          <form id="trade-form">
+            <input type="hidden" id="trade-id" />
+            <input type="hidden" id="trade-dir" value="Buy" />
+
+            <div class="tf-row tf-row-3">
+              <div class="field">
+                <label>Date *</label>
+                <input type="date" id="trade-date" required />
+              </div>
+              <div class="field">
+                <label>Pair *</label>
+                <select id="trade-pair-select" required>
+                  <option value="EURUSD">EURUSD</option>
+                  <option value="GBPUSD">GBPUSD</option>
+                  <option value="USDJPY">USDJPY</option>
+                  <option value="USDCHF">USDCHF</option>
+                  <option value="AUDUSD">AUDUSD</option>
+                  <option value="USDCAD">USDCAD</option>
+                  <option value="NZDUSD">NZDUSD</option>
+                  <option value="XAUUSD">XAUUSD (Gold)</option>
+                  <option value="XAGUSD">XAGUSD (Silver)</option>
+                  <option value="BTCUSD">BTCUSD</option>
+                  <option value="ETHUSD">ETHUSD</option>
+                  <option value="US30">US30</option>
+                  <option value="NAS100">NAS100</option>
+                  <option value="__custom__">Other pair...</option>
+                </select>
+                <input type="text" id="trade-pair-custom" class="hidden" placeholder="Other pair..." style="margin-top:8px;" />
+              </div>
+              <div class="field">
+                <label>Position</label>
+                <div class="toggle-pair">
+                  <button type="button" class="toggle-btn toggle-buy active" data-value="Buy">BUY</button>
+                  <button type="button" class="toggle-btn toggle-sell" data-value="Sell">SELL</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="tf-row tf-row-3">
+              <div class="field">
+                <label>Net P/L ($) *</label>
+                <input type="number" step="any" id="trade-pnl" required placeholder="250.00" />
+              </div>
+              <div class="field">
+                <label>Risk ($)</label>
+                <input type="number" step="any" id="trade-risk" placeholder="100.00" />
+              </div>
+              <div class="field">
+                <label>RR (auto)</label>
+                <input type="text" id="trade-rr-display" readonly placeholder="—" />
+              </div>
+            </div>
+
+            <div class="field full">
+              <label>HTF Opportunity</label>
+              <div class="pill-group" id="htf-group" data-mode="multi">
+                <button type="button" class="pill" data-value="Open to High">Open to High</button>
+                <button type="button" class="pill" data-value="Open to Low">Open to Low</button>
+                <button type="button" class="pill" data-value="Low to Close">Low to Close</button>
+                <button type="button" class="pill" data-value="High to Close">High to Close</button>
+              </div>
+              <div class="pill-add-row">
+                <input type="text" class="pill-add-input hidden" placeholder="Ketik lalu Enter..." />
+                <button type="button" class="pill-add-btn">+</button>
+              </div>
+            </div>
+
+            <div class="field full">
+              <label>Confluence</label>
+              <div class="pill-group" id="confluence-group" data-mode="multi">
+                <button type="button" class="pill" data-value="No Confluence">No Confluence</button>
+                <button type="button" class="pill" data-value="SMT">SMT</button>
+                <button type="button" class="pill" data-value="SSMT">SSMT</button>
+                <button type="button" class="pill" data-value="PSP">PSP</button>
+                <button type="button" class="pill" data-value="Hidden SMT">Hidden SMT</button>
+              </div>
+              <div class="pill-add-row">
+                <input type="text" class="pill-add-input hidden" placeholder="Ketik lalu Enter..." />
+                <button type="button" class="pill-add-btn">+</button>
+              </div>
+            </div>
+
+            <div class="field full">
+              <label>Result</label>
+              <div class="pill-group" id="result-group" data-mode="single">
+                <button type="button" class="pill" data-value="Break Even">Break Even</button>
+                <button type="button" class="pill" data-value="Full TP">Full TP</button>
+                <button type="button" class="pill" data-value="SL">SL</button>
+                <button type="button" class="pill" data-value="Partial">Partial</button>
+              </div>
+              <div class="pill-add-row">
+                <input type="text" class="pill-add-input hidden" placeholder="Ketik lalu Enter..." />
+                <button type="button" class="pill-add-btn">+</button>
+              </div>
+            </div>
+
+            <div class="tf-row tf-row-2">
+              <div class="field">
+                <label>HTF Link</label>
+                <input type="text" id="trade-htf-link" placeholder="TradingView link..." />
+              </div>
+              <div class="field">
+                <label>LTF Link</label>
+                <input type="text" id="trade-ltf-link" placeholder="TradingView link..." />
+              </div>
+            </div>
+
+            <div class="field full">
+              <label>Screenshot</label>
+              <input type="file" accept="image/*" id="trade-screenshot-file" class="hidden" />
+              <button type="button" class="btn-upload" id="trade-screenshot-trigger">📷 Upload Screenshot</button>
+              <div id="screenshot-preview-wrap" class="screenshot-preview-wrap hidden">
+                <img id="screenshot-preview-img" src="" alt="Screenshot preview" />
+                <button type="button" id="screenshot-remove-btn">✕ Hapus</button>
+              </div>
+              <div id="screenshot-error" class="error-msg hidden" style="margin-top:8px;"></div>
+            </div>
+
+            <div class="field full">
+              <label>Naratif Setup (opsional)</label>
+              <textarea id="trade-narrative" rows="2" placeholder="Cerita/alasan entry..."></textarea>
+            </div>
+
+            <div class="modal-actions">
+              <button type="button" class="btn btn-ghost" id="trade-form-cancel-btn">Cancel</button>
+              <button type="submit" class="btn btn-primary" id="trade-save-btn">Save Trade</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="toolbar">
+          <div class="toolbar-filters">
+            <input type="text" id="filter-pair" placeholder="Cari pair/instrumen..." />
+            <select id="filter-dir">
+              <option value="">Semua posisi</option>
+              <option value="Buy">Buy</option>
+              <option value="Sell">Sell</option>
+            </select>
+            <select id="filter-result">
+              <option value="">Semua hasil</option>
+              <option value="win">Profit</option>
+              <option value="loss">Loss</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tanggal</th>
+                <th>Pair</th>
+                <th>Posisi</th>
+                <th>HTF</th>
+                <th class="mono">R:R</th>
+                <th class="mono">P&L</th>
+                <th>Result</th>
+                <th>Confluence</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="trades-tbody"></tbody>
+          </table>
+          <div id="empty-state" class="empty-state hidden">
+            <div class="big">📓</div>
+            <div>Belum ada trade di akun ini. Klik "+ New Trade" untuk mulai mencatat.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ ANALYTICS TAB ============ -->
+      <section id="tab-analytics" class="tab-content hidden">
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-label">Total Trade</div>
+            <div class="stat-value neu" id="stat-total">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Win Rate</div>
+            <div class="stat-value neu" id="stat-winrate">0%</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total P&L</div>
+            <div class="stat-value neu" id="stat-pnl">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Rata-rata Profit</div>
+            <div class="stat-value pos" id="stat-avgwin">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Rata-rata Loss</div>
+            <div class="stat-value neg" id="stat-avgloss">0</div>
+          </div>
+        </div>
+
+        <div class="curve-panel">
+          <div class="curve-panel-header">
+            <h3>EQUITY CURVE (KUMULATIF P&L)</h3>
+            <span id="curve-range">-</span>
+          </div>
+          <svg id="equity-svg" width="100%" height="120" viewBox="0 0 1000 120" preserveAspectRatio="none"></svg>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ===================== MODAL TAMBAH AKUN ===================== -->
+  <div id="account-modal-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h2>Tambah Akun Trading</h2>
+      <p class="modal-desc" id="account-modal-desc">Bikin akun trading pertama lo. Bisa nambah akun lain lagi nanti (misal Akun Real & Akun Demo).</p>
+      <div id="account-modal-error" class="error-msg hidden"></div>
+      <form id="account-form">
+        <div class="field">
+          <label>Nama Akun</label>
+          <input type="text" id="account-name" required placeholder="Contoh: Akun Real, Akun Demo" />
+        </div>
+        <div class="field">
+          <label>Modal Awal (Starting Balance)</label>
+          <input type="number" step="any" id="account-balance" required placeholder="Contoh: 1000" />
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost hidden" id="account-cancel-btn">Batal</button>
+          <button type="submit" class="btn btn-primary" id="account-save-btn">Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
