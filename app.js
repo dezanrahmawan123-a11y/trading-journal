@@ -90,6 +90,10 @@ const accountModalDesc = document.getElementById("account-modal-desc");
 const accountForm = document.getElementById("account-form");
 const accountCancelBtn = document.getElementById("account-cancel-btn");
 
+// ---------- DOM refs: trade detail modal ----------
+const tradeDetailOverlay = document.getElementById("trade-detail-overlay");
+const tradeDetailContent = document.getElementById("trade-detail-content");
+
 // ---------- DOM refs: dashboard ----------
 const calSubtitle = document.getElementById("cal-subtitle");
 const calMonthLabel = document.getElementById("cal-month-label");
@@ -677,6 +681,127 @@ function parseOptionalFloat(v) {
 }
 
 // ============================================================
+// TRADE DETAIL / RECAP MODAL
+// ============================================================
+
+tradeDetailOverlay.addEventListener("click", (e) => {
+  if (e.target === tradeDetailOverlay) closeTradeDetail();
+});
+
+function closeTradeDetail() {
+  tradeDetailOverlay.classList.add("hidden");
+  tradeDetailContent.innerHTML = "";
+}
+
+function openTradeDetail(trade) {
+  const pnlClass = trade.pnl > 0 ? "pos" : (trade.pnl < 0 ? "neg" : "neu");
+  const dirClass = trade.position === "Buy" ? "dir-buy" : "dir-sell";
+  const resultClass = trade.pnl > 0 ? "result-profit" : (trade.pnl < 0 ? "result-loss" : "result-breakeven");
+
+  const htfTags = (trade.htfBias || []).length
+    ? `<div class="detail-tags">${trade.htfBias.map(v => `<span class="detail-tag">${escapeHtml(v)}</span>`).join("")}</div>`
+    : `<div class="detail-empty-note">Gak ada data HTF opportunity.</div>`;
+
+  const confluenceTags = (trade.confluence || []).length
+    ? `<div class="detail-tags">${trade.confluence.map(v => `<span class="detail-tag">${escapeHtml(v)}</span>`).join("")}</div>`
+    : `<div class="detail-empty-note">Gak ada confluence yang dicatat.</div>`;
+
+  const narrativeHtml = trade.narrative
+    ? `<div class="detail-narrative">${escapeHtml(trade.narrative)}</div>`
+    : `<div class="detail-empty-note">Belum ada naratif untuk trade ini.</div>`;
+
+  const links = [];
+  if (trade.htfLink) links.push(`<a class="detail-link-btn" href="${escapeHtml(trade.htfLink)}" target="_blank" rel="noopener">🔗 HTF Chart</a>`);
+  if (trade.ltfLink) links.push(`<a class="detail-link-btn" href="${escapeHtml(trade.ltfLink)}" target="_blank" rel="noopener">🔗 LTF Chart</a>`);
+  const linksHtml = links.length
+    ? `<div class="detail-links">${links.join("")}</div>`
+    : `<div class="detail-empty-note">Gak ada link chart.</div>`;
+
+  const screenshotHtml = trade.screenshotData
+    ? `<img class="detail-screenshot" src="${trade.screenshotData}" alt="Screenshot trade" id="detail-screenshot-img" />`
+    : `<div class="detail-empty-note">Gak ada screenshot.</div>`;
+
+  tradeDetailContent.innerHTML = `
+    <div class="detail-header">
+      <div class="detail-header-left">
+        <span class="detail-pair">${escapeHtml(trade.pair || "-")}</span>
+        <span class="detail-date">${trade.date || "-"}</span>
+        <div class="detail-badges">
+          <span class="dir-badge ${dirClass}">${trade.position || "-"}</span>
+          <span class="result-badge ${resultClass}">${escapeHtml(trade.result || "-")}</span>
+        </div>
+      </div>
+      <div class="detail-pnl-block">
+        <div class="detail-pnl-label">Net P/L</div>
+        <div class="detail-pnl-value ${pnlClass}">${formatMoney(trade.pnl)}</div>
+      </div>
+    </div>
+
+    <div class="detail-grid">
+      <div class="detail-stat">
+        <div class="detail-stat-label">Risk</div>
+        <div class="detail-stat-value">${trade.risk ? formatMoney(trade.risk) : "-"}</div>
+      </div>
+      <div class="detail-stat">
+        <div class="detail-stat-label">Risk : Reward</div>
+        <div class="detail-stat-value">${escapeHtml(trade.riskReward || "-")}</div>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">HTF Opportunity</div>
+      ${htfTags}
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Confluence</div>
+      ${confluenceTags}
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Naratif Setup</div>
+      ${narrativeHtml}
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Chart Links</div>
+      ${linksHtml}
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Screenshot</div>
+      ${screenshotHtml}
+    </div>
+
+    <div class="detail-actions">
+      <button type="button" class="btn btn-danger" id="detail-delete-btn" style="flex:0;">Hapus</button>
+      <button type="button" class="btn btn-ghost" id="detail-close-btn">Tutup</button>
+      <button type="button" class="btn btn-primary" id="detail-edit-btn">Edit Trade</button>
+    </div>
+  `;
+
+  document.getElementById("detail-close-btn").addEventListener("click", closeTradeDetail);
+  document.getElementById("detail-edit-btn").addEventListener("click", () => {
+    closeTradeDetail();
+    openTradeForm(trade);
+  });
+  document.getElementById("detail-delete-btn").addEventListener("click", async () => {
+    if (confirm("Hapus trade ini?")) {
+      await removeTrade(trade.id);
+      closeTradeDetail();
+    }
+  });
+  if (trade.screenshotData) {
+    document.getElementById("detail-screenshot-img").addEventListener("click", () => {
+      const w = window.open();
+      w.document.write(`<title>Screenshot</title><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="${trade.screenshotData}" style="max-width:100%;max-height:100vh;" /></body>`);
+    });
+  }
+
+  tradeDetailOverlay.classList.remove("hidden");
+}
+
+// ============================================================
 // HELPERS
 // ============================================================
 
@@ -773,6 +898,8 @@ function renderTable(trades) {
 
   trades.forEach(t => {
     const tr = document.createElement("tr");
+    tr.className = "trades-tbody-row";
+    tr.dataset.id = t.id;
     const pnlClass = t.pnl > 0 ? "pos" : (t.pnl < 0 ? "neg" : "neu");
     const dirClass = t.position === "Buy" ? "dir-buy" : "dir-sell";
     const resultClass = t.pnl > 0 ? "result-profit" : (t.pnl < 0 ? "result-loss" : "result-breakeven");
@@ -795,6 +922,14 @@ function renderTable(trades) {
       </td>
     `;
     tradesTbody.appendChild(tr);
+  });
+
+  tradesTbody.querySelectorAll(".trades-tbody-row").forEach(row => {
+    row.addEventListener("click", (e) => {
+      if (e.target.closest(".btn-edit, .btn-danger, .screenshot-icon")) return;
+      const trade = allTrades.find(t => t.id === row.dataset.id);
+      if (trade) openTradeDetail(trade);
+    });
   });
 
   tradesTbody.querySelectorAll(".screenshot-icon").forEach(icon => {
@@ -965,7 +1100,7 @@ function renderRecentTrades(accountTrades) {
   recentTradesList.innerHTML = recent.map(t => {
     const pnlClass = t.pnl > 0 ? "pos" : (t.pnl < 0 ? "neg" : "neu");
     return `
-      <div class="recent-item">
+      <div class="recent-item recent-item-clickable" data-id="${t.id}">
         <div class="recent-item-left">
           <span class="recent-item-pair">${escapeHtml(t.pair || "-")}</span>
           <span class="recent-item-date">${t.date || "-"} · ${escapeHtml(t.position || "-")}</span>
@@ -974,6 +1109,13 @@ function renderRecentTrades(accountTrades) {
       </div>
     `;
   }).join("");
+
+  recentTradesList.querySelectorAll(".recent-item-clickable").forEach(item => {
+    item.addEventListener("click", () => {
+      const trade = allTrades.find(t => t.id === item.dataset.id);
+      if (trade) openTradeDetail(trade);
+    });
+  });
 }
 
 function renderDashboardStats(monthTrades, accountTrades) {
