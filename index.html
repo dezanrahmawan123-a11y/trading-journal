@@ -350,12 +350,47 @@
           </div>
         </div>
 
-        <div class="curve-panel">
+        <div class="curve-panel" id="growth-panel">
           <div class="curve-panel-header">
-            <h3>EQUITY CURVE (KUMULATIF P&L)</h3>
-            <span id="curve-range">-</span>
+            <div>
+              <h3>TRADE GROWTH VIEW</h3>
+              <span class="panel-sub">Equity curve over time</span>
+            </div>
+            <div class="growth-change" id="growth-change">-</div>
           </div>
-          <svg id="equity-svg" width="100%" height="120" viewBox="0 0 1000 120" preserveAspectRatio="none"></svg>
+          <svg id="growth-svg" width="100%" height="180" viewBox="0 0 1000 180" preserveAspectRatio="none"></svg>
+          <div class="growth-footer">
+            <span id="growth-start-label">Start</span>
+            <span id="growth-end-label">-</span>
+          </div>
+        </div>
+
+        <div class="analytics-row-2">
+          <div class="panel donut-panel">
+            <h3>Symbol Performance</h3>
+            <div class="donut-wrap">
+              <svg id="symbol-donut-svg" viewBox="0 0 120 120" width="120" height="120"></svg>
+              <div class="donut-legend" id="symbol-legend"></div>
+            </div>
+          </div>
+          <div class="panel donut-panel">
+            <h3>Win / Loss Ratio</h3>
+            <div class="donut-wrap">
+              <svg id="winloss-donut-svg" viewBox="0 0 120 120" width="120" height="120"></svg>
+              <div class="donut-legend" id="winloss-legend"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="analytics-row-2">
+          <div class="panel bar-panel">
+            <h3>PnL by Weekday</h3>
+            <svg id="weekday-bar-svg" width="100%" height="140" viewBox="0 0 400 140" preserveAspectRatio="none"></svg>
+          </div>
+          <div class="panel bar-panel">
+            <h3>PnL by Result</h3>
+            <svg id="result-bar-svg" width="100%" height="140" viewBox="0 0 400 140" preserveAspectRatio="none"></svg>
+          </div>
         </div>
       </section>
 

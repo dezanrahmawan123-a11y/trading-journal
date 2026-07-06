@@ -978,45 +978,250 @@ function renderAnalytics(trades) {
   document.getElementById("stat-avgwin").textContent = formatNum(avgWin);
   document.getElementById("stat-avgloss").textContent = formatNum(avgLoss);
 
-  renderEquityCurve(trades);
+  renderGrowthChart(trades);
+  renderSymbolDonut(trades);
+  renderWinLossDonut(trades);
+  renderWeekdayBar(trades);
+  renderResultBar(trades);
 }
 
-function renderEquityCurve(trades) {
-  const svg = document.getElementById("equity-svg");
-  const rangeLabel = document.getElementById("curve-range");
+const CHART_PALETTE = ["#7c6cff", "#2ee6a6", "#ffb648", "#ff5c7a", "#4cc9f0", "#f72585", "#80ed99", "#e0aaff"];
+
+function renderGrowthChart(trades) {
+  const svg = document.getElementById("growth-svg");
+  const changeEl = document.getElementById("growth-change");
+  const startLabel = document.getElementById("growth-start-label");
+  const endLabel = document.getElementById("growth-end-label");
   svg.innerHTML = "";
 
+  const account = getCurrentAccount();
+  const startingBalance = account?.startingBalance || 0;
+
   if (trades.length === 0) {
-    rangeLabel.textContent = "-";
+    changeEl.textContent = "-";
+    changeEl.className = "growth-change neu";
+    startLabel.textContent = "-";
+    endLabel.textContent = "-";
+    svg.innerHTML = `<text x="500" y="90" text-anchor="middle" fill="#8b8b96" font-size="13">Belum ada data trade</text>`;
     return;
   }
 
   const chrono = [...trades].sort((a, b) => (a.date > b.date ? 1 : -1));
-  let cum = 0;
-  const points = chrono.map(t => (cum += t.pnl));
+  let cum = startingBalance;
+  const points = [cum, ...chrono.map(t => (cum += t.pnl))];
 
-  const w = 1000, h = 120, pad = 8;
-  const min = Math.min(0, ...points);
-  const max = Math.max(0, ...points);
+  const w = 1000, h = 180, padL = 60, padR = 10, padT = 14, padB = 10;
+  const min = Math.min(...points);
+  const max = Math.max(...points);
   const range = (max - min) || 1;
 
   const coords = points.map((val, i) => {
-    const x = points.length === 1 ? w / 2 : (i / (points.length - 1)) * (w - pad * 2) + pad;
-    const y = h - pad - ((val - min) / range) * (h - pad * 2);
+    const x = points.length === 1 ? padL : padL + (i / (points.length - 1)) * (w - padL - padR);
+    const y = padT + (h - padT - padB) - ((val - min) / range) * (h - padT - padB);
     return [x, y];
   });
 
-  const pathD = coords.map((c, i) => (i === 0 ? `M ${c[0]},${c[1]}` : `L ${c[0]},${c[1]}`)).join(" ");
+  const lineD = coords.map((c, i) => (i === 0 ? `M ${c[0]},${c[1]}` : `L ${c[0]},${c[1]}`)).join(" ");
+  const areaD = `${lineD} L ${coords[coords.length - 1][0]},${h - padB} L ${coords[0][0]},${h - padB} Z`;
+
   const lastVal = points[points.length - 1];
-  const strokeColor = lastVal >= 0 ? "#2ee6a6" : "#ff5c7a";
-  const zeroY = h - pad - ((0 - min) / range) * (h - pad * 2);
+  const changeAbs = lastVal - startingBalance;
+  const changePct = startingBalance > 0 ? (changeAbs / startingBalance) * 100 : null;
+  const isUp = changeAbs >= 0;
+  const strokeColor = isUp ? "#2ee6a6" : "#ff5c7a";
+
+  changeEl.textContent = changePct !== null
+    ? `${formatMoney(changeAbs)} (${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%)`
+    : formatMoney(changeAbs);
+  changeEl.className = "growth-change " + (isUp ? "pos" : "neg");
+
+  startLabel.textContent = `Start · ${formatMoney(startingBalance)}`;
+  endLabel.textContent = `${chrono[chrono.length - 1].date} · ${formatMoney(lastVal)}`;
+
+  // 4 garis grid horizontal + label sumbu Y
+  let gridLines = "";
+  const tickCount = 4;
+  for (let i = 0; i <= tickCount; i++) {
+    const val = min + (range * i / tickCount);
+    const y = padT + (h - padT - padB) - (i / tickCount) * (h - padT - padB);
+    gridLines += `<line x1="${padL}" y1="${y}" x2="${w - padR}" y2="${y}" stroke="#232933" stroke-width="1" stroke-dasharray="3 4" />`;
+    gridLines += `<text x="${padL - 8}" y="${y + 3}" text-anchor="end" font-size="10" fill="#8b8b96" font-family="monospace">${formatMoney(val).replace(".00", "")}</text>`;
+  }
 
   svg.innerHTML = `
-    <line x1="0" y1="${zeroY}" x2="${w}" y2="${zeroY}" stroke="#26262f" stroke-width="1" stroke-dasharray="4 4" />
-    <path d="${pathD}" fill="none" stroke="${strokeColor}" stroke-width="2.5" />
+    <defs>
+      <linearGradient id="growthFill" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${strokeColor}" stop-opacity="0.28" />
+        <stop offset="100%" stop-color="${strokeColor}" stop-opacity="0" />
+      </linearGradient>
+    </defs>
+    ${gridLines}
+    <path d="${areaD}" fill="url(#growthFill)" stroke="none" />
+    <path d="${lineD}" fill="none" stroke="${strokeColor}" stroke-width="2.5" />
   `;
+}
 
-  rangeLabel.textContent = `${chrono[0].date} → ${chrono[chrono.length - 1].date} · ${formatNum(lastVal)}`;
+function buildDonutSVG(svgEl, segments) {
+  svgEl.innerHTML = "";
+  const total = segments.reduce((s, seg) => s + seg.value, 0);
+  if (total <= 0) {
+    svgEl.innerHTML = `<circle cx="60" cy="60" r="44" fill="none" stroke="#232933" stroke-width="16" />`;
+    return;
+  }
+  const r = 44, cx = 60, cy = 60;
+  const circumference = 2 * Math.PI * r;
+  let cumulative = 0;
+  let circles = "";
+  segments.forEach(seg => {
+    if (seg.value <= 0) return;
+    const dash = (seg.value / total) * circumference;
+    circles += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${seg.color}" stroke-width="16"
+      stroke-dasharray="${dash} ${circumference - dash}" stroke-dashoffset="${-cumulative}"
+      transform="rotate(-90 ${cx} ${cy})" stroke-linecap="butt" />`;
+    cumulative += dash;
+  });
+  svgEl.innerHTML = circles;
+}
+
+function renderSymbolDonut(trades) {
+  const svg = document.getElementById("symbol-donut-svg");
+  const legend = document.getElementById("symbol-legend");
+
+  if (trades.length === 0) {
+    buildDonutSVG(svg, []);
+    legend.innerHTML = `<div class="chart-empty-note">Belum ada data.</div>`;
+    return;
+  }
+
+  const byPair = {};
+  trades.forEach(t => {
+    const key = t.pair || "-";
+    if (!byPair[key]) byPair[key] = { count: 0, pnl: 0 };
+    byPair[key].count += 1;
+    byPair[key].pnl += t.pnl;
+  });
+
+  const entries = Object.entries(byPair).sort((a, b) => b[1].count - a[1].count);
+  const segments = entries.map(([pair, data], i) => ({
+    label: pair, value: data.count, pnl: data.pnl, count: data.count,
+    color: CHART_PALETTE[i % CHART_PALETTE.length]
+  }));
+
+  buildDonutSVG(svg, segments);
+  legend.innerHTML = segments.map(seg => `
+    <div class="donut-legend-item">
+      <div class="donut-legend-left">
+        <span class="donut-dot" style="background:${seg.color}"></span>
+        <span class="donut-legend-label">${escapeHtml(seg.label)}</span>
+      </div>
+      <div style="text-align:right;">
+        <div class="donut-legend-value ${seg.pnl > 0 ? 'pos' : seg.pnl < 0 ? 'neg' : 'neu'}">${formatNum(seg.pnl)}</div>
+        <div class="donut-legend-sub">${seg.count} trades</div>
+      </div>
+    </div>
+  `).join("");
+}
+
+function renderWinLossDonut(trades) {
+  const svg = document.getElementById("winloss-donut-svg");
+  const legend = document.getElementById("winloss-legend");
+
+  const wins = trades.filter(t => t.pnl > 0).length;
+  const losses = trades.filter(t => t.pnl < 0).length;
+  const bes = trades.filter(t => t.pnl === 0).length;
+  const total = trades.length;
+
+  if (total === 0) {
+    buildDonutSVG(svg, []);
+    legend.innerHTML = `<div class="chart-empty-note">Belum ada data.</div>`;
+    return;
+  }
+
+  const segments = [
+    { label: "Win", value: wins, color: "#2ee6a6" },
+    { label: "Loss", value: losses, color: "#ff5c7a" },
+    { label: "Breakeven", value: bes, color: "#ffb648" },
+  ].filter(s => s.value > 0);
+
+  buildDonutSVG(svg, segments);
+  const winRate = ((wins / total) * 100).toFixed(0);
+
+  legend.innerHTML = `
+    <div class="donut-legend-item">
+      <div class="donut-legend-left"><span class="donut-dot" style="background:#2ee6a6"></span><span class="donut-legend-label">Win</span></div>
+      <div class="donut-legend-value pos">${wins}</div>
+    </div>
+    <div class="donut-legend-item">
+      <div class="donut-legend-left"><span class="donut-dot" style="background:#ff5c7a"></span><span class="donut-legend-label">Loss</span></div>
+      <div class="donut-legend-value neg">${losses}</div>
+    </div>
+    ${bes > 0 ? `
+    <div class="donut-legend-item">
+      <div class="donut-legend-left"><span class="donut-dot" style="background:#ffb648"></span><span class="donut-legend-label">Breakeven</span></div>
+      <div class="donut-legend-value neu">${bes}</div>
+    </div>` : ""}
+    <div class="donut-legend-item" style="margin-top:4px; border-top:1px solid var(--border-soft); padding-top:8px;">
+      <div class="donut-legend-left"><span class="donut-legend-label">Win Rate</span></div>
+      <div class="donut-legend-value pos">${winRate}%</div>
+    </div>
+  `;
+}
+
+function buildBarChartSVG(svgEl, bars) {
+  svgEl.innerHTML = "";
+  const w = 400, h = 140, padL = 8, padR = 8, padT = 10, padB = 20;
+  const values = bars.map(b => b.value);
+  const maxAbs = Math.max(1, ...values.map(v => Math.abs(v)));
+  const zeroY = padT + (h - padT - padB) / 2;
+  const halfH = (h - padT - padB) / 2;
+
+  const barW = (w - padL - padR) / bars.length;
+  let content = `<line x1="${padL}" y1="${zeroY}" x2="${w - padR}" y2="${zeroY}" stroke="#26262f" stroke-width="1" />`;
+
+  bars.forEach((bar, i) => {
+    const x = padL + i * barW + barW * 0.2;
+    const bw = barW * 0.6;
+    const barH = Math.abs(bar.value) / maxAbs * halfH;
+    const y = bar.value >= 0 ? zeroY - barH : zeroY;
+    const color = bar.value > 0 ? "#2ee6a6" : bar.value < 0 ? "#ff5c7a" : "#3a4152";
+    content += `<rect x="${x}" y="${y}" width="${bw}" height="${Math.max(barH, bar.value === 0 ? 2 : 0)}" fill="${color}" rx="2" />`;
+    content += `<text x="${x + bw / 2}" y="${h - 6}" text-anchor="middle" font-size="9.5" fill="#8b8b96">${escapeHtml(bar.label)}</text>`;
+  });
+
+  svgEl.innerHTML = content;
+}
+
+function renderWeekdayBar(trades) {
+  const svg = document.getElementById("weekday-bar-svg");
+  const dayNames = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+  const sums = [0, 0, 0, 0, 0, 0, 0];
+
+  trades.forEach(t => {
+    if (!t.date) return;
+    const d = new Date(t.date + "T00:00:00");
+    sums[d.getDay()] += t.pnl;
+  });
+
+  const bars = dayNames.map((name, i) => ({ label: name, value: sums[i] }));
+  buildBarChartSVG(svg, bars);
+}
+
+function renderResultBar(trades) {
+  const svg = document.getElementById("result-bar-svg");
+  const byResult = {};
+  trades.forEach(t => {
+    const key = t.result || "No Result";
+    byResult[key] = (byResult[key] || 0) + t.pnl;
+  });
+
+  const entries = Object.entries(byResult);
+  if (entries.length === 0) {
+    svg.innerHTML = `<text x="200" y="70" text-anchor="middle" fill="#8b8b96" font-size="12">Belum ada data</text>`;
+    return;
+  }
+
+  const bars = entries.map(([label, value]) => ({ label, value }));
+  buildBarChartSVG(svg, bars);
 }
 
 // ============================================================
