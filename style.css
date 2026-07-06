@@ -816,3 +816,60 @@ td.mono, th.mono { font-family: var(--font-mono); }
 @media (max-width: 780px) {
   .tf-row-3 { grid-template-columns: 1fr; }
 }
+
+/* ---------- Mobile refinements ---------- */
+@media (max-width: 780px) {
+  .topbar {
+    padding: 12px 16px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .topbar .wordmark { font-size: 12px; }
+  .topbar-right { gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .user-email { display: none; }
+  #account-switcher {
+    max-width: 130px;
+    font-size: 12px;
+    padding: 7px 8px;
+  }
+  .btn-ghost { padding: 8px 12px; font-size: 12px; }
+
+  .tabs { padding: 0 12px; overflow-x: auto; }
+  .tab-btn { padding: 12px 10px; font-size: 12.5px; white-space: nowrap; }
+
+  main { padding: 14px; }
+
+  .dash-row { grid-template-columns: 1fr; gap: 12px; }
+  .panel { padding: 16px; }
+
+  .calendar-weekdays { font-size: 9.5px; }
+  .calendar-grid { gap: 3px; }
+  .cal-cell { padding: 4px 5px; font-size: 9.5px; border-radius: 6px; }
+  .cal-cell .cal-day-pnl { font-size: 8.5px; }
+  .month-nav { font-size: 11px; gap: 6px; }
+  .month-nav span { min-width: 45px; }
+
+  #dashboard-stats-row { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat-card { padding: 14px; }
+  .stat-value { font-size: 19px; }
+  .mini-badges { flex-wrap: wrap; }
+
+  .tradelog-header { flex-wrap: wrap; gap: 10px; }
+  .tradelog-header h2 { font-size: 18px; }
+  #tradelog-stats-row { grid-template-columns: 1fr 1fr; }
+
+  .trade-form-panel { padding: 18px 16px; }
+  .toolbar-filters { width: 100%; }
+  .toolbar-filters input, .toolbar-filters select { flex: 1; min-width: 0; }
+
+  .pill { padding: 9px 14px; font-size: 12px; }
+  .toggle-btn { padding: 12px 8px; }
+
+  .modal { padding: 22px 18px; }
+}
+
+@media (max-width: 420px) {
+  #dashboard-stats-row, #tradelog-stats-row { grid-template-columns: 1fr; }
+  .stats-row { grid-template-columns: 1fr 1fr; }
+  .cal-cell .cal-day-pnl { display: none; }
+}
