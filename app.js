@@ -94,6 +94,10 @@ const accountCancelBtn = document.getElementById("account-cancel-btn");
 const tradeDetailOverlay = document.getElementById("trade-detail-overlay");
 const tradeDetailContent = document.getElementById("trade-detail-content");
 
+// ---------- DOM refs: day detail modal ----------
+const dayDetailOverlay = document.getElementById("day-detail-overlay");
+const dayDetailContent = document.getElementById("day-detail-content");
+
 // ---------- DOM refs: dashboard ----------
 const calSubtitle = document.getElementById("cal-subtitle");
 const calMonthLabel = document.getElementById("cal-month-label");
@@ -829,6 +833,17 @@ function formatNum(n) {
   return sign + Number(n).toLocaleString("id-ID", { maximumFractionDigits: 2 });
 }
 
+function formatNumCompact(n) {
+  if (n === null || n === undefined || isNaN(n)) return "-";
+  const sign = n > 0 ? "+" : (n < 0 ? "-" : "");
+  const abs = Math.abs(n);
+  if (abs >= 1000) {
+    const k = (abs / 1000).toFixed(1).replace(/\.0$/, "");
+    return `${sign}${k}k`;
+  }
+  return `${sign}${Math.round(abs)}`;
+}
+
 function formatMoney(n) {
   if (n === null || n === undefined || isNaN(n)) return "$0.00";
   const sign = n < 0 ? "-" : "";
@@ -1258,10 +1273,11 @@ function renderDashboard(accountTrades) {
 function renderCalendarGrid(year, month, monthTrades) {
   calendarGrid.innerHTML = "";
 
-  const pnlByDay = {};
+  const tradesByDay = {};
   monthTrades.forEach(t => {
     const day = parseInt(t.date.split("-")[2], 10);
-    pnlByDay[day] = (pnlByDay[day] || 0) + t.pnl;
+    if (!tradesByDay[day]) tradesByDay[day] = [];
+    tradesByDay[day].push(t);
   });
 
   const firstDay = new Date(year, month, 1);
@@ -1280,19 +1296,84 @@ function renderCalendarGrid(year, month, monthTrades) {
 
   for (let day = 1; day <= daysInMonth; day++) {
     const cell = document.createElement("div");
+    const dayTrades = tradesByDay[day];
     cell.className = "cal-cell";
-    const pnl = pnlByDay[day];
 
-    if (pnl !== undefined) cell.classList.add(pnl >= 0 ? "cal-win" : "cal-loss");
+    if (dayTrades && dayTrades.length) {
+      const pnl = dayTrades.reduce((s, t) => s + t.pnl, 0);
+      cell.classList.add(pnl >= 0 ? "cal-win" : "cal-loss", "cal-has-data");
+      cell.dataset.day = day;
+      cell.innerHTML = `
+        <span class="cal-day-num">${day}</span>
+        <span class="cal-day-pnl">${formatNumCompact(pnl)}</span>
+        <span class="cal-day-count">${dayTrades.length} trade${dayTrades.length > 1 ? "s" : ""}</span>
+      `;
+      cell.addEventListener("click", () => openDayDetail(year, month, day, dayTrades));
+    } else {
+      cell.innerHTML = `<span class="cal-day-num">${day}</span>`;
+    }
+
     if (isCurrentMonth && day === today.getDate()) cell.classList.add("cal-today");
-
-    cell.innerHTML = `
-      <span class="cal-day-num">${day}</span>
-      ${pnl !== undefined ? `<span class="cal-day-pnl">${formatNum(pnl)}</span>` : ""}
-    `;
     calendarGrid.appendChild(cell);
   }
 }
+
+function openDayDetail(year, month, day, dayTrades) {
+  const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  const dateLabel = `${day} ${MONTH_NAMES_ID[month]} ${year}`;
+  const totalPnl = dayTrades.reduce((s, t) => s + t.pnl, 0);
+  const wins = dayTrades.filter(t => t.pnl > 0).length;
+  const losses = dayTrades.filter(t => t.pnl < 0).length;
+
+  const itemsHtml = dayTrades.map(t => {
+    const pnlClass = t.pnl > 0 ? "pos" : (t.pnl < 0 ? "neg" : "neu");
+    const dirClass = t.position === "Buy" ? "dir-buy" : "dir-sell";
+    return `
+      <div class="day-detail-item" data-id="${t.id}">
+        <div class="day-detail-item-left">
+          <span class="dir-badge ${dirClass}">${t.position || "-"}</span>
+          <span class="day-detail-item-pair">${escapeHtml(t.pair || "-")}</span>
+        </div>
+        <span class="day-detail-item-pnl ${pnlClass}">${formatNum(t.pnl)}</span>
+      </div>
+    `;
+  }).join("");
+
+  dayDetailContent.innerHTML = `
+    <div class="day-detail-header">
+      <div>
+        <div class="day-detail-date">${dateLabel}</div>
+        <div class="day-detail-sub">${dayTrades.length} trade · ${wins} win / ${losses} loss</div>
+      </div>
+      <div class="day-detail-pnl">
+        <div class="day-detail-pnl-label">Total P&L</div>
+        <div class="day-detail-pnl-value ${totalPnl > 0 ? 'pos' : totalPnl < 0 ? 'neg' : 'neu'}">${formatMoney(totalPnl)}</div>
+      </div>
+    </div>
+    <div class="day-detail-list">${itemsHtml}</div>
+  `;
+
+  dayDetailContent.querySelectorAll(".day-detail-item").forEach(item => {
+    item.addEventListener("click", () => {
+      const trade = allTrades.find(t => t.id === item.dataset.id);
+      if (trade) {
+        closeDayDetail();
+        openTradeDetail(trade);
+      }
+    });
+  });
+
+  dayDetailOverlay.classList.remove("hidden");
+}
+
+function closeDayDetail() {
+  dayDetailOverlay.classList.add("hidden");
+  dayDetailContent.innerHTML = "";
+}
+
+dayDetailOverlay.addEventListener("click", (e) => {
+  if (e.target === dayDetailOverlay) closeDayDetail();
+});
 
 function renderRecentTrades(accountTrades) {
   const recent = [...accountTrades].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 6);
