@@ -1,27 +1,27 @@
 :root {
-  --bg: #0d0808;
-  --panel: #1a0f0f;
-  --panel-2: #221313;
-  --border: #4a1c1c;
-  --border-soft: #331616;
-  --text: #f3e8e6;
-  --text-dim: #b08f8a;
-  --accent: #e8291c;
-  --accent-soft: rgba(232,41,28,0.16);
-  --magenta: #c81e14;
-  --magenta-soft: rgba(200,30,20,0.16);
-  --green: #3ddc84;
-  --green-soft: rgba(61,220,132,0.14);
-  --red: #ff5a3c;
-  --red-soft: rgba(255,90,60,0.16);
-  --amber: #f5c518;
-  --amber-soft: rgba(245,197,24,0.16);
-  --radius: 8px;
-  --radius-sm: 6px;
-  --shadow-hard: 0 14px 34px rgba(0,0,0,0.6);
-  --shadow-hard-sm: 0 8px 20px rgba(0,0,0,0.55);
+  --bg: #0b0505;
+  --panel: #170a0a;
+  --panel-2: #1f0e0e;
+  --border: #4a1414;
+  --border-soft: #2a0d0d;
+  --text: #f0e4e0;
+  --text-dim: #9c7a76;
+  --accent: #b8281f;
+  --accent-soft: rgba(184,40,31,0.18);
+  --magenta: #8a1b16;
+  --magenta-soft: rgba(138,27,22,0.18);
+  --green: #4ade80;
+  --green-soft: rgba(74,222,128,0.14);
+  --red: #ff4d3d;
+  --red-soft: rgba(255,77,61,0.16);
+  --amber: #e8b23d;
+  --amber-soft: rgba(232,178,61,0.16);
+  --radius: 4px;
+  --radius-sm: 3px;
+  --shadow-hard: 0 18px 44px rgba(0,0,0,0.7);
+  --shadow-hard-sm: 0 10px 26px rgba(0,0,0,0.6);
   --shadow-hard-press: 0 3px 10px rgba(0,0,0,0.5);
-  --font-display: 'Bebas Neue', 'Oswald', sans-serif;
+  --font-display: 'Black Ops One', 'Staatliches', 'Bebas Neue', sans-serif;
   --font-ui: 'Barlow', 'Inter', sans-serif;
   --font-mono: 'JetBrains Mono', 'Courier New', monospace;
 }
@@ -31,8 +31,9 @@
 
 body {
   background:
-    radial-gradient(ellipse 900px 500px at 50% -10%, rgba(232,41,28,0.28), transparent 60%),
-    radial-gradient(ellipse 700px 500px at 100% 100%, rgba(232,41,28,0.10), transparent 60%),
+    radial-gradient(circle 420px at 50% 8%, rgba(184,40,31,0.35), transparent 65%),
+    radial-gradient(ellipse 900px 700px at 50% 0%, rgba(80,10,10,0.5), transparent 70%),
+    radial-gradient(ellipse 1000px 800px at 50% 100%, rgba(0,0,0,0.85), transparent 60%),
     var(--bg);
   color: var(--text);
   font-family: var(--font-ui);
@@ -44,12 +45,13 @@ body::before {
   content: "";
   position: fixed;
   top: 0; left: 0; right: 0;
-  height: 5px;
-  background: repeating-linear-gradient(90deg, var(--accent) 0px, var(--accent) 3px, #000 3px, #000 9px);
+  height: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 12px rgba(184,40,31,0.6);
   z-index: 100;
 }
 
-h1, h2, h3 { font-family: var(--font-display); letter-spacing: .5px; }
+h1, h2, h3 { font-family: var(--font-display); letter-spacing: 1px; }
 
 .hidden { display: none !important; }
 
@@ -181,8 +183,14 @@ h1, h2, h3 { font-family: var(--font-display); letter-spacing: .5px; }
 }
 .btn:active { transform: translate(3px, 3px); box-shadow: none; }
 
-.btn-primary { background: var(--accent); color: #fffdf7; width: 100%; }
-.btn-primary:hover { background: #ff4a3a; }
+.btn-primary {
+  background: transparent;
+  border: 2px solid var(--accent);
+  color: var(--text);
+  width: 100%;
+  letter-spacing: 1.5px;
+}
+.btn-primary:hover { background: var(--accent-soft); box-shadow: 0 0 16px rgba(184,40,31,0.4); }
 
 .btn-ghost { background: var(--panel-2); color: var(--text); }
 .btn-ghost:hover { background: var(--panel-2); }
