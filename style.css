@@ -633,6 +633,18 @@ td.mono, th.mono { font-family: var(--font-mono); }
 .cal-cell.cal-loss .cal-day-pnl { color: var(--red); }
 .cal-cell.cal-today { border-color: var(--magenta); box-shadow: 0 0 0 2px var(--magenta-soft); }
 
+.cal-cell.cal-empty-clickable { cursor: pointer; transition: border-color .15s, background .15s; }
+.cal-cell.cal-empty-clickable:hover { border-color: var(--accent); background: var(--panel-2); }
+.cal-cell.cal-empty-clickable .cal-day-add {
+  align-self: flex-end;
+  color: var(--text-dim);
+  font-size: 1.1em;
+  opacity: 0;
+  transition: opacity .15s;
+}
+.cal-cell.cal-empty-clickable:hover .cal-day-add { opacity: 1; color: var(--accent); }
+.cal-cell.cal-future { opacity: 0.35; }
+
 .recent-list { display: flex; flex-direction: column; gap: 10px; max-height: 320px; overflow-y: auto; }
 .recent-item {
   display: flex;
@@ -1062,6 +1074,7 @@ td.mono, th.mono { font-family: var(--font-mono); }
 .day-detail-item-left { display: flex; align-items: center; gap: 10px; }
 .day-detail-item-pair { font-weight: 600; font-size: 13.5px; }
 .day-detail-item-pnl { font-family: var(--font-mono); font-weight: 700; font-size: 13.5px; }
+.day-detail-add-btn { width: 100%; margin-top: 14px; }
 
 /* ---------- Analytics: growth / donut / bar charts ---------- */
 .growth-change {

@@ -550,7 +550,7 @@ function getActivePillValues(groupId) {
 // OPEN / CLOSE / SUBMIT TRADE FORM
 // ============================================================
 
-function openTradeForm(trade = null) {
+function openTradeForm(trade = null, presetDate = null) {
   tradeForm.reset();
   tradeFormError.classList.add("hidden");
   pairCustom.classList.add("hidden");
@@ -558,7 +558,7 @@ function openTradeForm(trade = null) {
 
   document.getElementById("trade-id").value = trade?.id || "";
   tradeFormTitleText.textContent = trade ? "Edit Trade" : "New Trade Entry";
-  document.getElementById("trade-date").value = trade?.date || new Date().toISOString().slice(0, 10);
+  document.getElementById("trade-date").value = trade?.date || presetDate || new Date().toISOString().slice(0, 10);
 
   const presetValues = Array.from(pairSelect.options).map(o => o.value);
   if (trade?.pair && presetValues.includes(trade.pair)) {
@@ -602,6 +602,12 @@ function openTradeForm(trade = null) {
   tradeFormPanel.classList.remove("hidden");
   setToggleBtnState(true);
   tradeFormPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function goToTradeLogAndAddTrade(dateStr) {
+  const tabBtn = document.querySelector('.tab-btn[data-tab="tradelog"]');
+  if (tabBtn) tabBtn.click();
+  openTradeForm(null, dateStr);
 }
 
 function closeTradeForm() {
@@ -1298,6 +1304,12 @@ function renderCalendarGrid(year, month, monthTrades) {
     const cell = document.createElement("div");
     const dayTrades = tradesByDay[day];
     cell.className = "cal-cell";
+    const cellDate = new Date(year, month, day);
+    cellDate.setHours(0, 0, 0, 0);
+    const todayMidnight = new Date();
+    todayMidnight.setHours(0, 0, 0, 0);
+    const isFuture = cellDate > todayMidnight;
+    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
     if (dayTrades && dayTrades.length) {
       const pnl = dayTrades.reduce((s, t) => s + t.pnl, 0);
@@ -1309,7 +1321,16 @@ function renderCalendarGrid(year, month, monthTrades) {
         <span class="cal-day-count">${dayTrades.length} trade${dayTrades.length > 1 ? "s" : ""}</span>
       `;
       cell.addEventListener("click", () => openDayDetail(year, month, day, dayTrades));
+    } else if (!isFuture) {
+      cell.classList.add("cal-empty-clickable");
+      cell.innerHTML = `
+        <span class="cal-day-num">${day}</span>
+        <span class="cal-day-add">+</span>
+      `;
+      cell.title = "Tambah trade di tanggal ini";
+      cell.addEventListener("click", () => goToTradeLogAndAddTrade(dateStr));
     } else {
+      cell.classList.add("cal-future");
       cell.innerHTML = `<span class="cal-day-num">${day}</span>`;
     }
 
@@ -1351,7 +1372,13 @@ function openDayDetail(year, month, day, dayTrades) {
       </div>
     </div>
     <div class="day-detail-list">${itemsHtml}</div>
+    <button type="button" class="btn btn-ghost day-detail-add-btn" id="day-detail-add-btn">+ Tambah trade lain di hari ini</button>
   `;
+
+  document.getElementById("day-detail-add-btn").addEventListener("click", () => {
+    closeDayDetail();
+    goToTradeLogAndAddTrade(dateStr);
+  });
 
   dayDetailContent.querySelectorAll(".day-detail-item").forEach(item => {
     item.addEventListener("click", () => {
