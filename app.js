@@ -256,6 +256,7 @@ function renderAccountSwitcher() {
   addOpt.value = "__add__";
   addOpt.textContent = "+ Tambah Akun Baru";
   accountSwitcher.appendChild(addOpt);
+  refreshCustomSelect(accountSwitcher);
 }
 
 accountSwitcher.addEventListener("change", () => {
@@ -1294,6 +1295,23 @@ function buildBarChartSVG(svgEl, bars) {
 
 function renderWeekdayBar(trades) {
   const svg = document.getElementById("weekday-bar-svg");
+  const titleEl = document.getElementById("weekday-bar-title");
+  const period = document.getElementById("analytics-period")?.value || "all";
+
+  if (period === "year") {
+    titleEl.textContent = "PnL by Month";
+    const sums = new Array(12).fill(0);
+    trades.forEach(t => {
+      if (!t.date) return;
+      const d = new Date(t.date + "T00:00:00");
+      sums[d.getMonth()] += t.pnl;
+    });
+    const bars = MONTH_NAMES_ID.map((name, i) => ({ label: name, value: sums[i] }));
+    buildBarChartSVG(svg, bars);
+    return;
+  }
+
+  titleEl.textContent = "PnL by Weekday";
   const dayNames = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
   const sums = [0, 0, 0, 0, 0, 0, 0];
 
@@ -1551,3 +1569,78 @@ function renderDashboardStats(monthTrades, accountTrades) {
   document.getElementById("dash-balance").textContent = formatMoney(balance);
   document.getElementById("dash-balance-footnote").textContent = `Modal awal: ${formatMoney(startingBalance)}`;
 }
+
+// ============================================================
+// CUSTOM SMOOTH DROPDOWN (pengganti tampilan <select> bawaan browser)
+// ============================================================
+
+function enhanceSelect(select) {
+  if (select.dataset.cselEnhanced) return;
+  select.dataset.cselEnhanced = "1";
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "csel";
+  wrapper.dataset.for = select.id || "";
+
+  select.parentNode.insertBefore(wrapper, select);
+  wrapper.appendChild(select);
+  select.classList.add("csel-native");
+
+  const trigger = document.createElement("div");
+  trigger.className = "csel-trigger";
+  trigger.innerHTML = `<span class="csel-trigger-label"></span><span class="csel-trigger-arrow"></span>`;
+  wrapper.appendChild(trigger);
+
+  const panel = document.createElement("div");
+  panel.className = "csel-panel";
+  wrapper.appendChild(panel);
+
+  function closePanel() { wrapper.classList.remove("csel-open"); }
+
+  function rebuildPanel() {
+    panel.innerHTML = "";
+    Array.from(select.options).forEach(opt => {
+      const optDiv = document.createElement("div");
+      optDiv.className = "csel-option" + (opt.selected ? " csel-selected" : "");
+      optDiv.textContent = opt.text;
+      optDiv.dataset.value = opt.value;
+      optDiv.addEventListener("click", () => {
+        select.value = opt.value;
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+        closePanel();
+        syncTrigger();
+      });
+      panel.appendChild(optDiv);
+    });
+  }
+
+  function syncTrigger() {
+    const sel = select.options[select.selectedIndex];
+    trigger.querySelector(".csel-trigger-label").textContent = sel ? sel.text : "";
+    panel.querySelectorAll(".csel-option").forEach(o => {
+      o.classList.toggle("csel-selected", o.dataset.value === select.value);
+    });
+  }
+
+  trigger.addEventListener("click", (e) => {
+    e.stopPropagation();
+    document.querySelectorAll(".csel.csel-open").forEach(w => { if (w !== wrapper) w.classList.remove("csel-open"); });
+    wrapper.classList.toggle("csel-open");
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!wrapper.contains(e.target)) closePanel();
+  });
+
+  rebuildPanel();
+  syncTrigger();
+
+  wrapper._cselRefresh = () => { rebuildPanel(); syncTrigger(); };
+}
+
+function refreshCustomSelect(select) {
+  const wrapper = select.closest(".csel");
+  if (wrapper && wrapper._cselRefresh) wrapper._cselRefresh();
+}
+
+document.querySelectorAll("select").forEach(enhanceSelect);
