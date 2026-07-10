@@ -1070,9 +1070,10 @@ td.mono, th.mono { font-family: var(--font-mono); }
   background: var(--accent-soft);
   color: var(--accent);
   border: 1px solid var(--accent);
+  border-radius: 999px;
   font-family: var(--font-mono);
   font-size: 11px;
-  padding: 3px 9px;
+  padding: 4px 12px;
 }
 .detail-narrative {
   font-size: 13.5px;
@@ -1089,13 +1090,15 @@ td.mono, th.mono { font-family: var(--font-mono); }
   gap: 6px;
   background: var(--panel-2);
   border: 1px solid var(--border);
+  border-radius: 999px;
   color: var(--text);
   text-decoration: none;
   font-size: 12px;
   font-weight: 700;
-  padding: 7px 13px;
-  box-shadow: var(--shadow-hard-press);
+  padding: 8px 15px;
+  transition: border-color .15s;
 }
+.detail-link-btn:hover { border-color: var(--accent); color: var(--accent); }
 
 .detail-screenshot {
   width: 90px;
