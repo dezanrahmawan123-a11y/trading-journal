@@ -165,11 +165,13 @@ h1, h2, h3 { font-family: var(--font-display); letter-spacing: 1px; }
 .btn-ghost { background: var(--panel-2); color: var(--text); }
 .btn-ghost:hover { background: var(--panel-2); }
 
-.btn-danger { background: var(--red-soft); color: var(--red); padding: 7px 12px; font-size: 10px; box-shadow: var(--shadow-hard-press); }
-.btn-danger:active { transform: translate(1px, 1px); box-shadow: none; }
+.btn-danger { background: var(--red-soft); color: var(--red); border-color: transparent; border-radius: 999px; padding: 7px 14px; font-size: 10px; box-shadow: none; }
+.btn-danger:hover { background: var(--red); color: #fff; }
+.btn-danger:active { transform: scale(0.96); }
 
-.btn-edit { background: var(--panel-2); color: var(--text); padding: 7px 12px; font-size: 10px; box-shadow: var(--shadow-hard-press); }
-.btn-edit:active { transform: translate(1px, 1px); box-shadow: none; }
+.btn-edit { background: var(--panel-2); color: var(--text); border-color: transparent; border-radius: 999px; padding: 7px 14px; font-size: 10px; box-shadow: none; }
+.btn-edit:hover { border-color: var(--accent); color: var(--accent); }
+.btn-edit:active { transform: scale(0.96); }
 
 .auth-toggle {
   text-align: center;
