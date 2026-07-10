@@ -204,8 +204,8 @@ h1, h2, h3 { font-family: var(--font-display); letter-spacing: 1px; }
 .topbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 16px 32px;
+  justify-content: center;
+  padding: 18px 32px;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
   position: sticky;
@@ -214,8 +214,49 @@ h1, h2, h3 { font-family: var(--font-display); letter-spacing: 1px; }
 }
 
 .topbar .wordmark { margin: 0; }
-.topbar-right { display: flex; align-items: center; gap: 14px; }
-.user-email { font-size: 12px; color: var(--text-dim); font-family: var(--font-mono); }
+
+/* ---------- Profile shortcut (kiri bawah) ---------- */
+.profile-fab {
+  position: fixed;
+  bottom: 22px;
+  left: 22px;
+  width: 46px; height: 46px;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-hard-sm);
+  font-size: 18px;
+  cursor: pointer;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color .15s, transform .15s;
+}
+.profile-fab:hover { border-color: var(--accent); transform: translateY(-2px); }
+
+.profile-menu {
+  position: fixed;
+  bottom: 78px;
+  left: 22px;
+  width: 240px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-hard);
+  padding: 16px;
+  z-index: 41;
+  animation: fadeSlideIn .2s ease-out;
+}
+.profile-menu-email {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  margin-bottom: 12px;
+  word-break: break-all;
+}
+.profile-menu .field { margin-bottom: 12px; }
+.profile-menu .btn { width: 100%; }
 
 main {
   max-width: 1200px;
@@ -496,7 +537,8 @@ td.mono, th.mono { font-family: var(--font-mono); }
 /* ---------- Tabs ---------- */
 .tabs {
   display: flex;
-  gap: 0;
+  justify-content: center;
+  gap: 4px;
   padding: 0 32px;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
@@ -512,12 +554,11 @@ td.mono, th.mono { font-family: var(--font-mono); }
   text-transform: uppercase;
   padding: 14px 18px;
   cursor: pointer;
-  border-bottom: 4px solid transparent;
-  margin-bottom: -3px;
+  border-bottom: none;
   transition: color .15s;
 }
 .tab-btn:hover { color: var(--text); }
-.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-btn.active { color: var(--accent); }
 
 /* ---------- Dashboard layout ---------- */
 .dash-row {
@@ -1027,13 +1068,73 @@ td.mono, th.mono { font-family: var(--font-mono); }
 }
 
 .detail-screenshot {
-  width: 100%;
+  width: 90px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   cursor: zoom-in;
+  transition: border-color .15s;
 }
+.detail-screenshot:hover { border-color: var(--accent); }
+.detail-screenshot-hint { font-size: 11px; color: var(--text-dim); margin-top: 6px; }
 
 .detail-actions { display: flex; gap: 10px; margin-top: 8px; }
 .detail-actions .btn { flex: 1; }
+
+/* ---------- HTF multi-link list ---------- */
+.link-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.link-list-row { display: flex; gap: 8px; align-items: center; }
+.link-list-row input { flex: 1; }
+.link-remove-btn {
+  width: 32px; height: 32px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--red);
+  cursor: pointer;
+  font-size: 14px;
+}
+.link-remove-btn:hover { border-color: var(--red); }
+.pill-add-btn-full {
+  width: 100%;
+  background: var(--panel-2);
+  border: 1px dashed var(--border);
+  color: var(--text-dim);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.pill-add-btn-full:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ---------- Analytics toolbar ---------- */
+.analytics-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.analytics-toolbar label {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+.analytics-toolbar select {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  cursor: pointer;
+}
+.analytics-toolbar select:focus { outline: none; border-color: var(--accent); }
 
 /* ---------- Custom scrollbar ---------- */
 * {

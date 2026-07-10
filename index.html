@@ -13,7 +13,7 @@
   <!-- ===================== AUTH SCREEN ===================== -->
   <div id="auth-shell" class="auth-shell">
     <div class="auth-card">
-      <div class="wordmark">JURNAL // TRADING</div>
+      <div class="wordmark">JURNAL TRADING</div>
       <h1 id="auth-title">Masuk ke akun</h1>
       <p class="sub" id="auth-sub">Catat & analisa trade lo di satu tempat.</p>
 
@@ -41,12 +41,7 @@
   <!-- ===================== APP SCREEN ===================== -->
   <div id="app-shell" class="app-shell hidden">
     <div class="topbar">
-      <div class="wordmark">JURNAL // TRADING</div>
-      <div class="topbar-right">
-        <select id="account-switcher"></select>
-        <span class="user-email" id="user-email"></span>
-        <button class="btn btn-ghost" id="logout-btn">Keluar</button>
-      </div>
+      <div class="wordmark">JURNAL TRADING</div>
     </div>
 
     <nav class="tabs">
@@ -54,6 +49,17 @@
       <button class="tab-btn" data-tab="tradelog">Trade Log</button>
       <button class="tab-btn" data-tab="analytics">Analytics</button>
     </nav>
+
+    <!-- ===== Profile shortcut (kiri bawah) ===== -->
+    <button class="profile-fab" id="profile-fab-btn" title="Akun">👤</button>
+    <div class="profile-menu hidden" id="profile-menu">
+      <div class="profile-menu-email" id="user-email"></div>
+      <div class="field">
+        <label>Akun Aktif</label>
+        <select id="account-switcher"></select>
+      </div>
+      <button class="btn btn-ghost" id="logout-btn">Keluar</button>
+    </div>
 
     <main>
 
@@ -251,15 +257,15 @@
               </div>
             </div>
 
-            <div class="tf-row tf-row-2">
-              <div class="field">
-                <label>HTF Link</label>
-                <input type="text" id="trade-htf-link" placeholder="TradingView link..." />
-              </div>
-              <div class="field">
-                <label>LTF Link</label>
-                <input type="text" id="trade-ltf-link" placeholder="TradingView link..." />
-              </div>
+            <div class="field full">
+              <label>HTF Link (boleh lebih dari satu)</label>
+              <div id="htf-links-list" class="link-list"></div>
+              <button type="button" class="pill-add-btn-full" id="htf-link-add-btn">+ Tambah Link HTF</button>
+            </div>
+
+            <div class="field full">
+              <label>LTF Link</label>
+              <input type="text" id="trade-ltf-link" placeholder="TradingView link..." />
             </div>
 
             <div class="field full">
@@ -327,6 +333,16 @@
 
       <!-- ============ ANALYTICS TAB ============ -->
       <section id="tab-analytics" class="tab-content hidden">
+        <div class="analytics-toolbar">
+          <label for="analytics-period">Periode</label>
+          <select id="analytics-period">
+            <option value="all">Semua Waktu</option>
+            <option value="week">Minggu Ini</option>
+            <option value="month">Bulan Ini</option>
+            <option value="year">Tahun Ini</option>
+          </select>
+        </div>
+
         <div class="stats-row">
           <div class="stat-card">
             <div class="stat-label">Total Trade</div>

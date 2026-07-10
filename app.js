@@ -151,6 +151,20 @@ authForm.addEventListener("submit", async (e) => {
 
 logoutBtn.addEventListener("click", () => signOut(auth));
 
+// ---------- Profile shortcut menu ----------
+const profileFabBtn = document.getElementById("profile-fab-btn");
+const profileMenu = document.getElementById("profile-menu");
+
+profileFabBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  profileMenu.classList.toggle("hidden");
+});
+document.addEventListener("click", (e) => {
+  if (!profileMenu.classList.contains("hidden") && !profileMenu.contains(e.target) && e.target !== profileFabBtn) {
+    profileMenu.classList.add("hidden");
+  }
+});
+
 onAuthStateChanged(auth, (user) => {
   currentUser = user;
   if (user) {
@@ -581,7 +595,7 @@ function openTradeForm(trade = null, presetDate = null) {
   riskInput.value = trade?.risk ?? "";
   updateRRDisplay();
 
-  document.getElementById("trade-htf-link").value = trade?.htfLink || "";
+  renderHtfLinksList(trade?.htfLinks || (trade?.htfLink ? [trade.htfLink] : []));
   document.getElementById("trade-ltf-link").value = trade?.ltfLink || "";
   document.getElementById("trade-narrative").value = trade?.narrative || "";
 
@@ -602,6 +616,38 @@ function openTradeForm(trade = null, presetDate = null) {
   tradeFormPanel.classList.remove("hidden");
   setToggleBtnState(true);
   tradeFormPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// ---------- HTF multi-link list ----------
+const htfLinksList = document.getElementById("htf-links-list");
+const htfLinkAddBtn = document.getElementById("htf-link-add-btn");
+
+function renderHtfLinksList(links) {
+  htfLinksList.innerHTML = "";
+  const values = links.length ? links : [""];
+  values.forEach(val => addHtfLinkRow(val));
+}
+
+function addHtfLinkRow(value = "") {
+  const row = document.createElement("div");
+  row.className = "link-list-row";
+  row.innerHTML = `
+    <input type="text" class="htf-link-input" placeholder="TradingView link..." value="${escapeHtml(value)}" />
+    <button type="button" class="link-remove-btn" title="Hapus link">✕</button>
+  `;
+  row.querySelector(".link-remove-btn").addEventListener("click", () => {
+    row.remove();
+    if (htfLinksList.children.length === 0) addHtfLinkRow();
+  });
+  htfLinksList.appendChild(row);
+}
+
+htfLinkAddBtn.addEventListener("click", () => addHtfLinkRow());
+
+function getHtfLinksValues() {
+  return Array.from(htfLinksList.querySelectorAll(".htf-link-input"))
+    .map(inp => inp.value.trim())
+    .filter(v => v);
 }
 
 function goToTradeLogAndAddTrade(dateStr) {
@@ -669,7 +715,7 @@ tradeForm.addEventListener("submit", async (e) => {
     riskReward: riskRewardStr,
     result: resultValues[0] || "",
     pnl: pnlVal,
-    htfLink: document.getElementById("trade-htf-link").value.trim(),
+    htfLinks: getHtfLinksValues(),
     ltfLink: document.getElementById("trade-ltf-link").value.trim(),
     screenshotData: currentScreenshotData || null,
   };
@@ -721,14 +767,17 @@ function openTradeDetail(trade) {
     : `<div class="detail-empty-note">Belum ada naratif untuk trade ini.</div>`;
 
   const links = [];
-  if (trade.htfLink) links.push(`<a class="detail-link-btn" href="${escapeHtml(trade.htfLink)}" target="_blank" rel="noopener">🔗 HTF Chart</a>`);
+  const htfLinksArr = trade.htfLinks || (trade.htfLink ? [trade.htfLink] : []);
+  htfLinksArr.forEach((url, i) => {
+    links.push(`<a class="detail-link-btn" href="${escapeHtml(url)}" target="_blank" rel="noopener">🔗 HTF Chart${htfLinksArr.length > 1 ? ` ${i + 1}` : ""}</a>`);
+  });
   if (trade.ltfLink) links.push(`<a class="detail-link-btn" href="${escapeHtml(trade.ltfLink)}" target="_blank" rel="noopener">🔗 LTF Chart</a>`);
   const linksHtml = links.length
     ? `<div class="detail-links">${links.join("")}</div>`
     : `<div class="detail-empty-note">Gak ada link chart.</div>`;
 
   const screenshotHtml = trade.screenshotData
-    ? `<img class="detail-screenshot" src="${trade.screenshotData}" alt="Screenshot trade" id="detail-screenshot-img" />`
+    ? `<img class="detail-screenshot" src="${trade.screenshotData}" alt="Screenshot trade" id="detail-screenshot-img" /><div class="detail-screenshot-hint">Klik gambar buat lihat ukuran penuh</div>`
     : `<div class="detail-empty-note">Gak ada screenshot.</div>`;
 
   tradeDetailContent.innerHTML = `
@@ -888,9 +937,40 @@ function renderAll() {
   const accountTrades = getAccountTrades();
   renderTable(getFilteredTradeLog(accountTrades));
   renderTradeLogStats(accountTrades);
-  renderAnalytics(accountTrades);
+  renderAnalytics(getAnalyticsFilteredTrades(accountTrades));
   renderDashboard(accountTrades);
 }
+
+function getAnalyticsFilteredTrades(accountTrades) {
+  const periodSelect = document.getElementById("analytics-period");
+  const period = periodSelect ? periodSelect.value : "all";
+  if (period === "all") return accountTrades;
+
+  const now = new Date();
+  return accountTrades.filter(t => {
+    if (!t.date) return false;
+    const d = new Date(t.date + "T00:00:00");
+    if (period === "week") {
+      const dayIdx = (now.getDay() + 6) % 7; // Senin = 0
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - dayIdx);
+      monday.setHours(0, 0, 0, 0);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      sunday.setHours(23, 59, 59, 999);
+      return d >= monday && d <= sunday;
+    }
+    if (period === "month") {
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    }
+    if (period === "year") {
+      return d.getFullYear() === now.getFullYear();
+    }
+    return true;
+  });
+}
+
+document.getElementById("analytics-period").addEventListener("change", renderAll);
 
 // ============================================================
 // RENDER: TRADE LOG STATS + TABLE
