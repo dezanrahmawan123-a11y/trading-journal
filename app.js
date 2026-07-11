@@ -8,7 +8,7 @@ import { firebaseConfig } from "./firebase-config.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword,
-  createUserWithEmailAndPassword, signOut
+  createUserWithEmailAndPassword, signOut, sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   getFirestore, collection, addDoc, updateDoc, deleteDoc,
@@ -23,7 +23,7 @@ const db = getFirestore(app);
 // GANTI INI dengan User UID akun lo sendiri (lihat panduan di chat).
 // Akun dengan UID ini otomatis jadi admin & gak perlu approval.
 // ============================================================
-const ADMIN_UID = "igxAKYsyzqMZOUs3xTl8J42ya333";
+const ADMIN_UID = "ISI_UID_ADMIN_DISINI";
 
 const MONTH_NAMES_ID = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Ags","Sep","Okt","Nov","Des"];
 const WEEKDAY_START_MONDAY = true;
@@ -52,6 +52,8 @@ const authSubmitBtn = document.getElementById("auth-submit-btn");
 const authToggleText = document.getElementById("auth-toggle-text");
 const authToggleBtn = document.getElementById("auth-toggle-btn");
 const authError = document.getElementById("auth-error");
+const authSuccess = document.getElementById("auth-success");
+const forgotPasswordBtn = document.getElementById("forgot-password-btn");
 const userEmailEl = document.getElementById("user-email");
 const logoutBtn = document.getElementById("logout-btn");
 const adminApprovalBtn = document.getElementById("admin-approval-btn");
@@ -123,24 +125,28 @@ const recentTradesList = document.getElementById("recent-trades-list");
 authToggleBtn.addEventListener("click", () => {
   isRegisterMode = !isRegisterMode;
   authError.classList.add("hidden");
+  authSuccess.classList.add("hidden");
   if (isRegisterMode) {
     authTitle.textContent = "Buat akun baru";
     authSub.textContent = "Gratis, data lo tersimpan aman per akun.";
     authSubmitBtn.textContent = "Daftar";
     authToggleText.textContent = "Sudah punya akun?";
     authToggleBtn.textContent = "Masuk";
+    document.getElementById("forgot-password-row").classList.add("hidden");
   } else {
     authTitle.textContent = "Masuk ke akun";
     authSub.textContent = "Catat & analisa trade lo di satu tempat.";
     authSubmitBtn.textContent = "Masuk";
     authToggleText.textContent = "Belum punya akun?";
     authToggleBtn.textContent = "Daftar sekarang";
+    document.getElementById("forgot-password-row").classList.remove("hidden");
   }
 });
 
 authForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   authError.classList.add("hidden");
+  authSuccess.classList.add("hidden");
   const email = document.getElementById("auth-email").value.trim();
   const password = document.getElementById("auth-password").value;
 
@@ -165,6 +171,27 @@ authForm.addEventListener("submit", async (e) => {
 });
 
 logoutBtn.addEventListener("click", () => signOut(auth));
+
+forgotPasswordBtn.addEventListener("click", async () => {
+  authError.classList.add("hidden");
+  authSuccess.classList.add("hidden");
+
+  const email = document.getElementById("auth-email").value.trim();
+  if (!email) {
+    authError.textContent = "Isi dulu email lo di kolom atas, baru klik 'Lupa password?'.";
+    authError.classList.remove("hidden");
+    return;
+  }
+
+  try {
+    await sendPasswordResetEmail(auth, email);
+    authSuccess.textContent = `Link reset password udah dikirim ke ${email}. Cek inbox (atau folder spam) email itu.`;
+    authSuccess.classList.remove("hidden");
+  } catch (err) {
+    authError.textContent = translateFirebaseError(err.code);
+    authError.classList.remove("hidden");
+  }
+});
 
 // ---------- Profile shortcut menu ----------
 const profileFabBtn = document.getElementById("profile-fab-btn");

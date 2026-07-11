@@ -194,6 +194,18 @@ h1, h2, h3 { font-family: var(--font-display); letter-spacing: 1px; }
   border-radius: var(--radius-sm);
   margin-bottom: 16px;
 }
+.success-msg {
+  background: var(--green-soft);
+  border: 2px solid var(--green);
+  color: var(--green);
+  font-size: 12.5px;
+  padding: 10px 13px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 16px;
+}
+#forgot-password-row { margin-top: 10px; margin-bottom: 0; }
+#forgot-password-row button { font-size: 12.5px; color: var(--text-dim); }
+#forgot-password-row button:hover { color: var(--accent); }
 
 /* ---------- App shell ---------- */
 .app-shell { min-height: 100vh; }
