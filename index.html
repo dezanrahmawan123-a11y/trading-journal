@@ -38,6 +38,16 @@
     </div>
   </div>
 
+  <!-- ===================== MENUNGGU PERSETUJUAN ===================== -->
+  <div id="pending-shell" class="auth-shell hidden">
+    <div class="auth-card">
+      <div class="wordmark">JURNAL TRADING</div>
+      <h1>Menunggu Persetujuan</h1>
+      <p class="sub">Akun lo udah kedaftar, tapi masih nunggu admin approve sebelum bisa dipakai. Halaman ini bakal otomatis kebuka sendiri begitu di-approve.</p>
+      <button class="btn btn-ghost" id="pending-logout-btn" style="width:100%; margin-top:10px;">Keluar</button>
+    </div>
+  </div>
+
   <!-- ===================== APP SCREEN ===================== -->
   <div id="app-shell" class="app-shell hidden">
     <div class="topbar">
@@ -74,6 +84,7 @@
         <select id="account-switcher"></select>
       </div>
       <button class="btn btn-ghost" id="logout-btn">Keluar</button>
+      <button class="btn btn-ghost hidden" id="admin-approval-btn" style="margin-top:8px;">🔐 Kelola User Baru</button>
     </div>
 
     <main>
@@ -462,6 +473,18 @@
   <div id="day-detail-overlay" class="modal-overlay hidden">
     <div class="modal detail-modal">
       <div id="day-detail-content"></div>
+    </div>
+  </div>
+
+  <!-- ===================== MODAL ADMIN: KELOLA USER BARU ===================== -->
+  <div id="admin-modal-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h2>Kelola User Baru</h2>
+      <p class="modal-desc">Daftar orang yang mendaftar dan nunggu di-approve. Kalau di-tolak, akunnya gak akan bisa masuk lagi.</p>
+      <div id="admin-requests-list"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="admin-modal-close-btn" style="flex:1;">Tutup</button>
+      </div>
     </div>
   </div>
 

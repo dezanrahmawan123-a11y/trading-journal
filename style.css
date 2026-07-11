@@ -1358,3 +1358,20 @@ td.mono, th.mono { font-family: var(--font-mono); }
   .analytics-row-2 { grid-template-columns: 1fr; }
   .donut-wrap { flex-direction: column; align-items: flex-start; }
 }
+
+/* ---------- Admin: kelola persetujuan user ---------- */
+.admin-request-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+}
+.admin-request-email { font-size: 13px; font-weight: 600; word-break: break-all; }
+.admin-request-date { font-size: 11px; color: var(--text-dim); font-family: var(--font-mono); margin-top: 2px; }
+.admin-request-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.admin-request-empty { color: var(--text-dim); font-size: 13px; text-align: center; padding: 30px 10px; }

@@ -12,12 +12,18 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   getFirestore, collection, addDoc, updateDoc, deleteDoc,
-  doc, onSnapshot, query, orderBy, serverTimestamp
+  doc, setDoc, onSnapshot, query, orderBy, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+// ============================================================
+// GANTI INI dengan User UID akun lo sendiri (lihat panduan di chat).
+// Akun dengan UID ini otomatis jadi admin & gak perlu approval.
+// ============================================================
+const ADMIN_UID = "ISI_UID_ADMIN_DISINI";
 
 const MONTH_NAMES_ID = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Ags","Sep","Okt","Nov","Des"];
 const WEEKDAY_START_MONDAY = true;
@@ -30,11 +36,14 @@ let currentAccountId = null;
 let isRegisterMode = false;
 let unsubscribeTrades = null;
 let unsubscribeAccounts = null;
+let unsubscribeAccessRequest = null;
+let unsubscribeAdminRequests = null;
 let calendarViewDate = new Date();
 let isFirstAccountFlow = false;
 
 // ---------- DOM refs: auth ----------
 const authShell = document.getElementById("auth-shell");
+const pendingShell = document.getElementById("pending-shell");
 const appShell = document.getElementById("app-shell");
 const authForm = document.getElementById("auth-form");
 const authTitle = document.getElementById("auth-title");
@@ -45,6 +54,7 @@ const authToggleBtn = document.getElementById("auth-toggle-btn");
 const authError = document.getElementById("auth-error");
 const userEmailEl = document.getElementById("user-email");
 const logoutBtn = document.getElementById("logout-btn");
+const adminApprovalBtn = document.getElementById("admin-approval-btn");
 const accountSwitcher = document.getElementById("account-switcher");
 
 // ---------- DOM refs: tabs ----------
@@ -137,7 +147,12 @@ authForm.addEventListener("submit", async (e) => {
   authSubmitBtn.disabled = true;
   try {
     if (isRegisterMode) {
-      await createUserWithEmailAndPassword(auth, email, password);
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      await setDoc(doc(db, "access_requests", cred.user.uid), {
+        email: cred.user.email,
+        approved: cred.user.uid === ADMIN_UID,
+        requestedAt: serverTimestamp(),
+      });
     } else {
       await signInWithEmailAndPassword(auth, email, password);
     }
@@ -165,24 +180,115 @@ document.addEventListener("click", (e) => {
   }
 });
 
+// ---------- Admin: kelola persetujuan user baru ----------
+const adminModalOverlay = document.getElementById("admin-modal-overlay");
+const adminRequestsList = document.getElementById("admin-requests-list");
+const adminModalCloseBtn = document.getElementById("admin-modal-close-btn");
+
+adminApprovalBtn.addEventListener("click", () => {
+  profileMenu.classList.add("hidden");
+  adminModalOverlay.classList.remove("hidden");
+
+  if (unsubscribeAdminRequests) unsubscribeAdminRequests();
+  unsubscribeAdminRequests = onSnapshot(
+    query(collection(db, "access_requests"), orderBy("requestedAt", "desc")),
+    (snapshot) => {
+      const allReq = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderAdminRequests(allReq);
+    }
+  );
+});
+
+adminModalCloseBtn.addEventListener("click", () => {
+  adminModalOverlay.classList.add("hidden");
+  if (unsubscribeAdminRequests) unsubscribeAdminRequests();
+});
+adminModalOverlay.addEventListener("click", (e) => {
+  if (e.target === adminModalOverlay) adminModalCloseBtn.click();
+});
+
+function renderAdminRequests(allReq) {
+  if (allReq.length === 0) {
+    adminRequestsList.innerHTML = `<div class="admin-request-empty">Belum ada yang daftar.</div>`;
+    return;
+  }
+
+  adminRequestsList.innerHTML = allReq.map(r => {
+    const dateStr = r.requestedAt?.toDate ? r.requestedAt.toDate().toLocaleString("id-ID") : "-";
+    const statusBadge = r.approved
+      ? `<span class="result-badge result-profit">Approved</span>`
+      : `<span class="result-badge result-breakeven">Pending</span>`;
+    return `
+      <div class="admin-request-item">
+        <div>
+          <div class="admin-request-email">${escapeHtml(r.email || r.id)}</div>
+          <div class="admin-request-date">${dateStr}</div>
+        </div>
+        <div class="admin-request-actions">
+          ${statusBadge}
+          ${!r.approved ? `<button class="btn-edit" data-action="approve" data-id="${r.id}">Approve</button>` : ""}
+          <button class="btn-danger" data-action="reject" data-id="${r.id}">Tolak</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  adminRequestsList.querySelectorAll("[data-action='approve']").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      await updateDoc(doc(db, "access_requests", btn.dataset.id), { approved: true });
+    });
+  });
+  adminRequestsList.querySelectorAll("[data-action='reject']").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (confirm("Tolak user ini? Mereka gak akan bisa masuk lagi (akun login-nya tetap ada tapi terkunci).")) {
+        await deleteDoc(doc(db, "access_requests", btn.dataset.id));
+      }
+    });
+  });
+}
+
 onAuthStateChanged(auth, (user) => {
   currentUser = user;
   if (user) {
     authShell.classList.add("hidden");
-    appShell.classList.remove("hidden");
     userEmailEl.textContent = user.email;
-    subscribeToAccounts(user.uid);
-    subscribeToTrades(user.uid);
+
+    if (user.uid === ADMIN_UID) {
+      pendingShell.classList.add("hidden");
+      appShell.classList.remove("hidden");
+      adminApprovalBtn.classList.remove("hidden");
+      subscribeToAccounts(user.uid);
+      subscribeToTrades(user.uid);
+    } else {
+      adminApprovalBtn.classList.add("hidden");
+      unsubscribeAccessRequest = onSnapshot(doc(db, "access_requests", user.uid), (snap) => {
+        const approved = snap.exists() && snap.data().approved === true;
+        if (approved) {
+          pendingShell.classList.add("hidden");
+          appShell.classList.remove("hidden");
+          subscribeToAccounts(user.uid);
+          subscribeToTrades(user.uid);
+        } else {
+          appShell.classList.add("hidden");
+          pendingShell.classList.remove("hidden");
+        }
+      });
+    }
   } else {
     appShell.classList.add("hidden");
+    pendingShell.classList.add("hidden");
     authShell.classList.remove("hidden");
     if (unsubscribeTrades) unsubscribeTrades();
     if (unsubscribeAccounts) unsubscribeAccounts();
+    if (unsubscribeAccessRequest) unsubscribeAccessRequest();
+    if (unsubscribeAdminRequests) unsubscribeAdminRequests();
     allTrades = [];
     allAccounts = [];
     currentAccountId = null;
   }
 });
+
+document.getElementById("pending-logout-btn").addEventListener("click", () => signOut(auth));
 
 function translateFirebaseError(code) {
   const map = {
