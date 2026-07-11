@@ -23,7 +23,7 @@ const db = getFirestore(app);
 // GANTI INI dengan User UID akun lo sendiri (lihat panduan di chat).
 // Akun dengan UID ini otomatis jadi admin & gak perlu approval.
 // ============================================================
-const ADMIN_UID = "ISI_UID_ADMIN_DISINI";
+const ADMIN_UID = "igxAKYsyzqMZOUs3xTl8J42ya333";
 
 const MONTH_NAMES_ID = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Ags","Sep","Okt","Nov","Des"];
 const WEEKDAY_START_MONDAY = true;
