@@ -23,7 +23,7 @@ const db = getFirestore(app);
 // GANTI INI dengan User UID akun lo sendiri (lihat panduan di chat).
 // Akun dengan UID ini otomatis jadi admin & gak perlu approval.
 // ============================================================
-const ADMIN_UID = "igxAKYsyzqMZOUs3xTl8J42ya333";
+const ADMIN_UID = "ISI_UID_ADMIN_DISINI";
 
 const MONTH_NAMES_ID = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Ags","Sep","Okt","Nov","Des"];
 const WEEKDAY_START_MONDAY = true;
@@ -38,6 +38,8 @@ let unsubscribeTrades = null;
 let unsubscribeAccounts = null;
 let unsubscribeAccessRequest = null;
 let unsubscribeAdminRequests = null;
+let unsubscribeNews = null;
+let allNews = [];
 let calendarViewDate = new Date();
 let isFirstAccountFlow = false;
 
@@ -286,6 +288,7 @@ onAuthStateChanged(auth, (user) => {
       adminApprovalBtn.classList.remove("hidden");
       subscribeToAccounts(user.uid);
       subscribeToTrades(user.uid);
+      subscribeToNews(user.uid);
     } else {
       adminApprovalBtn.classList.add("hidden");
       unsubscribeAccessRequest = onSnapshot(doc(db, "access_requests", user.uid), (snap) => {
@@ -295,6 +298,7 @@ onAuthStateChanged(auth, (user) => {
           appShell.classList.remove("hidden");
           subscribeToAccounts(user.uid);
           subscribeToTrades(user.uid);
+          subscribeToNews(user.uid);
         } else {
           appShell.classList.add("hidden");
           pendingShell.classList.remove("hidden");
@@ -309,6 +313,7 @@ onAuthStateChanged(auth, (user) => {
     if (unsubscribeAccounts) unsubscribeAccounts();
     if (unsubscribeAccessRequest) unsubscribeAccessRequest();
     if (unsubscribeAdminRequests) unsubscribeAdminRequests();
+    if (unsubscribeNews) unsubscribeNews();
     allTrades = [];
     allAccounts = [];
     currentAccountId = null;
@@ -461,6 +466,107 @@ function subscribeToTrades(uid) {
     allTrades = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
     renderAll();
   }, (err) => console.error(err));
+}
+
+// ============================================================
+// FIRESTORE: NEWS
+// ============================================================
+
+function newsCollection(uid) {
+  return collection(db, "users", uid, "news");
+}
+
+function subscribeToNews(uid) {
+  const q = query(newsCollection(uid), orderBy("date", "asc"));
+  unsubscribeNews = onSnapshot(q, (snapshot) => {
+    allNews = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderAll();
+  }, (err) => console.error(err));
+}
+
+async function saveNews(newsData, newsId) {
+  if (newsId) {
+    await updateDoc(doc(db, "users", currentUser.uid, "news", newsId), newsData);
+  } else {
+    await addDoc(newsCollection(currentUser.uid), { ...newsData, createdAt: serverTimestamp() });
+  }
+}
+
+async function removeNews(newsId) {
+  await deleteDoc(doc(db, "users", currentUser.uid, "news", newsId));
+}
+
+const newsModalOverlay = document.getElementById("news-modal-overlay");
+const newsModalError = document.getElementById("news-modal-error");
+const newsForm = document.getElementById("news-form");
+const newsCancelBtn = document.getElementById("news-cancel-btn");
+const newsDeleteBtn = document.getElementById("news-delete-btn");
+const newsAddBtn = document.getElementById("news-add-btn");
+const newsFilter = document.getElementById("news-filter");
+
+function openNewsModal(news = null, presetDate = null) {
+  newsForm.reset();
+  newsModalError.classList.add("hidden");
+  document.getElementById("news-id").value = news?.id || "";
+  document.getElementById("news-title").value = news?.title || "";
+  document.getElementById("news-date").value = news?.date || presetDate || new Date().toISOString().slice(0, 10);
+  document.querySelectorAll("#news-impact-group .pill").forEach(p => p.classList.remove("active"));
+  const impactPill = document.querySelector(`#news-impact-group .pill[data-value="${news?.impact || "medium"}"]`);
+  if (impactPill) impactPill.classList.add("active");
+  newsDeleteBtn.classList.toggle("hidden", !news);
+  newsModalOverlay.classList.remove("hidden");
+}
+
+function closeNewsModal() {
+  newsModalOverlay.classList.add("hidden");
+}
+
+newsAddBtn.addEventListener("click", () => openNewsModal());
+newsCancelBtn.addEventListener("click", closeNewsModal);
+newsModalOverlay.addEventListener("click", (e) => { if (e.target === newsModalOverlay) closeNewsModal(); });
+
+newsForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  newsModalError.classList.add("hidden");
+
+  const newsId = document.getElementById("news-id").value || null;
+  const title = document.getElementById("news-title").value.trim();
+  const date = document.getElementById("news-date").value;
+  const impactPill = document.querySelector("#news-impact-group .pill.active");
+  const impact = impactPill ? impactPill.dataset.value : "medium";
+
+  if (!title || !date) {
+    newsModalError.textContent = "Isi nama event dan tanggalnya.";
+    newsModalError.classList.remove("hidden");
+    return;
+  }
+
+  try {
+    await saveNews({ title, date, impact }, newsId);
+    closeNewsModal();
+  } catch (err) {
+    newsModalError.textContent = "Gagal menyimpan. Coba lagi.";
+    newsModalError.classList.remove("hidden");
+    console.error(err);
+  }
+});
+
+newsDeleteBtn.addEventListener("click", async () => {
+  const newsId = document.getElementById("news-id").value;
+  if (newsId && confirm("Hapus news ini?")) {
+    await removeNews(newsId);
+    closeNewsModal();
+  }
+});
+
+newsFilter.addEventListener("change", () => renderDashboard(getAccountTrades()));
+
+function getFilteredNews() {
+  const level = newsFilter.value;
+  if (level === "none") return [];
+  if (level === "high") return allNews.filter(n => n.impact === "high");
+  if (level === "medium") return allNews.filter(n => n.impact === "medium" || n.impact === "high");
+  return allNews;
 }
 
 async function saveTrade(tradeData, tradeId) {
@@ -658,13 +764,13 @@ function commitCustomPill(group, input) {
 }
 
 function resetPillGroups() {
-  document.querySelectorAll(".pill-group").forEach(group => {
+  document.querySelectorAll("#trade-form .pill-group").forEach(group => {
     group.querySelectorAll(".pill").forEach(p => {
       if (!p.dataset.original) p.remove();
       else p.classList.remove("active");
     });
   });
-  document.querySelectorAll(".pill-add-input").forEach(inp => {
+  document.querySelectorAll("#trade-form .pill-add-input").forEach(inp => {
     inp.value = "";
     inp.classList.add("hidden");
   });
@@ -746,6 +852,7 @@ function openTradeForm(trade = null, presetDate = null) {
   setActivePills("htf-group", trade?.htfBias);
   setActivePills("confluence-group", trade?.confluence);
   setActivePills("result-group", trade?.result ? [trade.result] : []);
+  setActivePills("mood-group", trade?.mood ? [trade.mood] : []);
 
   tradeFormPanel.classList.remove("hidden");
   setToggleBtnState(true);
@@ -836,6 +943,7 @@ tradeForm.addEventListener("submit", async (e) => {
   }
 
   const resultValues = getActivePillValues("result-group");
+  const moodValues = getActivePillValues("mood-group");
 
   const data = {
     accountId: currentAccountId,
@@ -848,6 +956,7 @@ tradeForm.addEventListener("submit", async (e) => {
     risk: riskVal,
     riskReward: riskRewardStr,
     result: resultValues[0] || "",
+    mood: moodValues[0] || "",
     pnl: pnlVal,
     htfLinks: getHtfLinksValues(),
     ltfLink: document.getElementById("trade-ltf-link").value.trim(),
@@ -949,6 +1058,11 @@ function openTradeDetail(trade) {
     <div class="detail-section">
       <div class="detail-section-title">Confluence</div>
       ${confluenceTags}
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Mood Saat Trading</div>
+      ${trade.mood ? `<div class="detail-tags"><span class="detail-tag">${escapeHtml(trade.mood)}</span></div>` : `<div class="detail-empty-note">Gak dicatat.</div>`}
     </div>
 
     <div class="detail-section">
@@ -1218,6 +1332,7 @@ function renderAnalytics(trades) {
   renderWinLossDonut(trades);
   renderWeekdayBar(trades);
   renderResultBar(trades);
+  renderSmartInsights(trades);
 }
 
 const CHART_PALETTE = ["#7c6cff", "#34d399", "#ffb648", "#f87171", "#4cc9f0", "#f72585", "#80ed99", "#e0aaff"];
@@ -1477,6 +1592,168 @@ function renderResultBar(trades) {
 }
 
 // ============================================================
+// SMART INSIGHTS (analisa pola otomatis, bukan AI beneran)
+// ============================================================
+
+function winRateOf(trades) {
+  if (trades.length === 0) return null;
+  const wins = trades.filter(t => t.pnl > 0).length;
+  return (wins / trades.length) * 100;
+}
+
+function groupBy(trades, keyFn) {
+  const map = {};
+  trades.forEach(t => {
+    const keys = keyFn(t);
+    (Array.isArray(keys) ? keys : [keys]).forEach(k => {
+      if (!k) return;
+      if (!map[k]) map[k] = [];
+      map[k].push(t);
+    });
+  });
+  return map;
+}
+
+function renderSmartInsights(trades) {
+  const list = document.getElementById("insights-list");
+  const insights = [];
+  const MIN_SAMPLE = 3;
+
+  if (trades.length < MIN_SAMPLE) {
+    list.innerHTML = `<div class="insight-empty">Minimal ${MIN_SAMPLE} trade dulu biar insight-nya akurat. Terus catat trade lo ya.</div>`;
+    return;
+  }
+
+  const byPair = groupBy(trades, t => t.pair);
+  const pairStats = Object.entries(byPair)
+    .filter(([, arr]) => arr.length >= 2)
+    .map(([pair, arr]) => ({ pair, wr: winRateOf(arr), count: arr.length, pnl: arr.reduce((s, t) => s + t.pnl, 0) }));
+  if (pairStats.length >= 2) {
+    const best = [...pairStats].sort((a, b) => b.wr - a.wr)[0];
+    const worst = [...pairStats].sort((a, b) => a.wr - b.wr)[0];
+    if (best.pair !== worst.pair) {
+      insights.push({
+        icon: "🎯",
+        text: `Win rate lo di <b>${escapeHtml(best.pair)}</b> ${best.wr.toFixed(0)}% (${best.count} trade), tapi di <b>${escapeHtml(worst.pair)}</b> cuma ${worst.wr.toFixed(0)}% (${worst.count} trade). Mungkin worth dipikirin buat lebih fokus ke pair yang lo lebih jago.`
+      });
+    }
+  }
+
+  const buys = trades.filter(t => t.position === "Buy");
+  const sells = trades.filter(t => t.position === "Sell");
+  if (buys.length >= 2 && sells.length >= 2) {
+    const wrBuy = winRateOf(buys), wrSell = winRateOf(sells);
+    if (Math.abs(wrBuy - wrSell) >= 15) {
+      const better = wrBuy > wrSell ? "Buy" : "Sell";
+      const worse = wrBuy > wrSell ? "Sell" : "Buy";
+      const betterWr = Math.max(wrBuy, wrSell), worseWr = Math.min(wrBuy, wrSell);
+      insights.push({
+        icon: "📈",
+        text: `Trade <b>${better}</b> lo menang ${betterWr.toFixed(0)}% dari waktu, sedangkan <b>${worse}</b> cuma ${worseWr.toFixed(0)}%. Ada gap yang cukup jauh nih di antara dua arah ini.`
+      });
+    }
+  }
+
+  const byConfluence = groupBy(trades, t => t.confluence || []);
+  const confStats = Object.entries(byConfluence)
+    .filter(([, arr]) => arr.length >= 2)
+    .map(([c, arr]) => ({ c, wr: winRateOf(arr), count: arr.length }));
+  if (confStats.length >= 2) {
+    const best = [...confStats].sort((a, b) => b.wr - a.wr)[0];
+    if (best.wr >= 60) {
+      insights.push({
+        icon: "✅",
+        text: `Setup dengan confluence <b>${escapeHtml(best.c)}</b> punya win rate ${best.wr.toFixed(0)}% dari ${best.count} trade — salah satu confluence paling konsisten buat lo sejauh ini.`
+      });
+    }
+  }
+
+  const dayNames = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+  const byWeekday = groupBy(trades, t => {
+    if (!t.date) return null;
+    return dayNames[new Date(t.date + "T00:00:00").getDay()];
+  });
+  const weekdayStats = Object.entries(byWeekday)
+    .filter(([, arr]) => arr.length >= 2)
+    .map(([day, arr]) => ({ day, pnl: arr.reduce((s, t) => s + t.pnl, 0), count: arr.length }));
+  if (weekdayStats.length >= 2) {
+    const best = [...weekdayStats].sort((a, b) => b.pnl - a.pnl)[0];
+    const worst = [...weekdayStats].sort((a, b) => a.pnl - b.pnl)[0];
+    if (worst.pnl < 0 && best.day !== worst.day) {
+      insights.push({
+        icon: "📅",
+        text: `Hari <b>${worst.day}</b> cenderung jadi hari boncos buat lo (total ${formatMoney(worst.pnl)} dari ${worst.count} trade), sedangkan <b>${best.day}</b> paling cuan (${formatMoney(best.pnl)}). Coba lebih hati-hati atau kurangi frekuensi trading di ${worst.day}.`
+      });
+    }
+  }
+
+  const byMood = groupBy(trades, t => t.mood);
+  const moodStats = Object.entries(byMood)
+    .filter(([, arr]) => arr.length >= 2)
+    .map(([mood, arr]) => ({ mood, wr: winRateOf(arr), count: arr.length }));
+  if (moodStats.length >= 2) {
+    const worst = [...moodStats].sort((a, b) => a.wr - b.wr)[0];
+    const best = [...moodStats].sort((a, b) => b.wr - a.wr)[0];
+    if (worst.mood !== best.mood && worst.wr <= 40) {
+      insights.push({
+        icon: "🧠",
+        text: `Pas mood lo <b>${escapeHtml(worst.mood)}</b>, win rate cuma ${worst.wr.toFixed(0)}% (${worst.count} trade). Pertimbangin buat rehat dulu kalau lagi ngerasa gitu, sebelum entry.`
+      });
+    }
+  }
+
+  const fullTP = trades.filter(t => t.result === "Full TP").length;
+  const partial = trades.filter(t => t.result === "Partial").length;
+  const sl = trades.filter(t => t.result === "SL").length;
+  if (partial + fullTP >= 4 && partial > fullTP) {
+    insights.push({
+      icon: "✂️",
+      text: `Dari trade yang profit, lo lebih sering close <b>Partial</b> (${partial}x) dibanding <b>Full TP</b> (${fullTP}x). Kalau ini kebiasaan cut winner kepagian, coba evaluasi lagi target TP-nya.`
+    });
+  }
+
+  const avgRRValues = trades.map(t => parseRR(t.riskReward)).filter(v => v !== null);
+  if (avgRRValues.length >= 3) {
+    const avgRR = avgRRValues.reduce((s, v) => s + v, 0) / avgRRValues.length;
+    const overallWR = winRateOf(trades);
+    const breakEvenWR = 100 / (1 + avgRR);
+    if (overallWR < breakEvenWR - 5) {
+      insights.push({
+        icon: "⚠️",
+        text: `Win rate lo ${overallWR.toFixed(0)}% dengan rata-rata R:R 1:${avgRR.toFixed(1)}. Secara matematis, buat balik modal aja butuh win rate minimal ~${breakEvenWR.toFixed(0)}%. Coba naikin target R:R atau perbaiki akurasi entry.`
+      });
+    } else if (overallWR >= breakEvenWR + 5) {
+      insights.push({
+        icon: "💪",
+        text: `Win rate lo ${overallWR.toFixed(0)}% udah di atas titik impas (~${breakEvenWR.toFixed(0)}%) buat rata-rata R:R 1:${avgRR.toFixed(1)} lo. Sistem trading lo secara matematis profitable — tinggal jaga konsistensi.`
+      });
+    }
+  }
+
+  if (sl >= 3 && trades.length >= 6) {
+    const slRate = (sl / trades.length) * 100;
+    if (slRate >= 50) {
+      insights.push({
+        icon: "🛑",
+        text: `${slRate.toFixed(0)}% trade lo berakhir kena <b>SL</b>. Ini sinyal buat evaluasi ulang kriteria entry lo — mungkin confluence-nya kurang kuat atau timing entry kurang pas.`
+      });
+    }
+  }
+
+  if (insights.length === 0) {
+    list.innerHTML = `<div class="insight-empty">Belum ketemu pola yang cukup signifikan. Terus catat trade lo biar insight-nya makin akurat.</div>`;
+    return;
+  }
+
+  list.innerHTML = insights.map(ins => `
+    <div class="insight-item">
+      <div class="insight-icon">${ins.icon}</div>
+      <div class="insight-text">${ins.text}</div>
+    </div>
+  `).join("");
+}
+
+// ============================================================
 // RENDER: DASHBOARD TAB
 // ============================================================
 
@@ -1499,15 +1776,22 @@ function renderDashboard(accountTrades) {
     return d.getFullYear() === year && d.getMonth() === month;
   });
 
+  const visibleNews = getFilteredNews();
+  const monthNews = visibleNews.filter(n => {
+    if (!n.date) return false;
+    const d = new Date(n.date + "T00:00:00");
+    return d.getFullYear() === year && d.getMonth() === month;
+  });
+
   calMonthLabel.textContent = `${MONTH_NAMES_ID[month]} ${year}`;
   calSubtitle.textContent = `${monthTrades.length} trade · ${MONTH_NAMES_ID[month]} ${year}`;
 
-  renderCalendarGrid(year, month, monthTrades);
+  renderCalendarGrid(year, month, monthTrades, monthNews);
   renderRecentTrades(accountTrades);
   renderDashboardStats(monthTrades, accountTrades);
 }
 
-function renderCalendarGrid(year, month, monthTrades) {
+function renderCalendarGrid(year, month, monthTrades, monthNews) {
   calendarGrid.innerHTML = "";
 
   const tradesByDay = {};
@@ -1515,6 +1799,13 @@ function renderCalendarGrid(year, month, monthTrades) {
     const day = parseInt(t.date.split("-")[2], 10);
     if (!tradesByDay[day]) tradesByDay[day] = [];
     tradesByDay[day].push(t);
+  });
+
+  const newsByDay = {};
+  (monthNews || []).forEach(n => {
+    const day = parseInt(n.date.split("-")[2], 10);
+    if (!newsByDay[day]) newsByDay[day] = [];
+    newsByDay[day].push(n);
   });
 
   const firstDay = new Date(year, month, 1);
@@ -1534,6 +1825,7 @@ function renderCalendarGrid(year, month, monthTrades) {
   for (let day = 1; day <= daysInMonth; day++) {
     const cell = document.createElement("div");
     const dayTrades = tradesByDay[day];
+    const dayNews = newsByDay[day] || [];
     cell.className = "cal-cell";
     const cellDate = new Date(year, month, day);
     cellDate.setHours(0, 0, 0, 0);
@@ -1542,16 +1834,29 @@ function renderCalendarGrid(year, month, monthTrades) {
     const isFuture = cellDate > todayMidnight;
     const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
+    const newsDotsHtml = dayNews.length
+      ? `<div class="cal-news-dots">${dayNews.slice(0, 3).map(n => `<span class="cal-news-dot ${n.impact}"></span>`).join("")}</div>`
+      : "";
+
     if (dayTrades && dayTrades.length) {
       const pnl = dayTrades.reduce((s, t) => s + t.pnl, 0);
       cell.classList.add(pnl >= 0 ? "cal-win" : "cal-loss", "cal-has-data");
       cell.dataset.day = day;
       cell.innerHTML = `
+        ${newsDotsHtml}
         <span class="cal-day-num">${day}</span>
         <span class="cal-day-pnl">${formatNumCompact(pnl)}</span>
         <span class="cal-day-count">${dayTrades.length} trade${dayTrades.length > 1 ? "s" : ""}</span>
       `;
-      cell.addEventListener("click", () => openDayDetail(year, month, day, dayTrades));
+      cell.addEventListener("click", () => openDayDetail(year, month, day, dayTrades, dayNews));
+    } else if (dayNews.length) {
+      cell.classList.add("cal-empty-clickable");
+      cell.innerHTML = `
+        ${newsDotsHtml}
+        <span class="cal-day-num">${day}</span>
+      `;
+      cell.title = `${dayNews.length} news di tanggal ini`;
+      cell.addEventListener("click", () => openDayDetail(year, month, day, [], dayNews));
     } else if (!isFuture) {
       cell.classList.add("cal-empty-clickable");
       cell.innerHTML = `
@@ -1570,7 +1875,7 @@ function renderCalendarGrid(year, month, monthTrades) {
   }
 }
 
-function openDayDetail(year, month, day, dayTrades) {
+function openDayDetail(year, month, day, dayTrades, dayNews) {
   const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
   const dateLabel = `${day} ${MONTH_NAMES_ID[month]} ${year}`;
   const totalPnl = dayTrades.reduce((s, t) => s + t.pnl, 0);
@@ -1591,24 +1896,48 @@ function openDayDetail(year, month, day, dayTrades) {
     `;
   }).join("");
 
-  dayDetailContent.innerHTML = `
-    <div class="day-detail-header">
-      <div>
-        <div class="day-detail-date">${dateLabel}</div>
-        <div class="day-detail-sub">${dayTrades.length} trade · ${wins} win / ${losses} loss</div>
-      </div>
-      <div class="day-detail-pnl">
-        <div class="day-detail-pnl-label">Total P&L</div>
-        <div class="day-detail-pnl-value ${totalPnl > 0 ? 'pos' : totalPnl < 0 ? 'neg' : 'neu'}">${formatMoney(totalPnl)}</div>
-      </div>
+  const impactLabel = { low: "🟡 Low", medium: "🟠 Medium", high: "🔴 Red Folder" };
+  const newsHtml = (dayNews || []).map(n => `
+    <div class="day-detail-news-item impact-${n.impact}" data-id="${n.id}">
+      <span class="day-detail-news-title">${escapeHtml(n.title)}</span>
+      <span class="day-detail-news-badge">${impactLabel[n.impact] || n.impact}</span>
     </div>
-    <div class="day-detail-list">${itemsHtml}</div>
-    <button type="button" class="btn btn-ghost day-detail-add-btn" id="day-detail-add-btn">+ Tambah trade lain di hari ini</button>
+  `).join("");
+
+  const newsSection = (dayNews && dayNews.length)
+    ? `<div class="detail-section-title" style="margin-top:16px;">📰 News</div>${newsHtml}`
+    : "";
+
+  const tradesSection = dayTrades.length
+    ? `
+      <div class="day-detail-header">
+        <div>
+          <div class="day-detail-date">${dateLabel}</div>
+          <div class="day-detail-sub">${dayTrades.length} trade · ${wins} win / ${losses} loss</div>
+        </div>
+        <div class="day-detail-pnl">
+          <div class="day-detail-pnl-label">Total P&L</div>
+          <div class="day-detail-pnl-value ${totalPnl > 0 ? 'pos' : totalPnl < 0 ? 'neg' : 'neu'}">${formatMoney(totalPnl)}</div>
+        </div>
+      </div>
+      <div class="day-detail-list">${itemsHtml}</div>
+    `
+    : `<div class="day-detail-header"><div><div class="day-detail-date">${dateLabel}</div><div class="day-detail-sub">Belum ada trade di tanggal ini</div></div></div>`;
+
+  dayDetailContent.innerHTML = `
+    ${tradesSection}
+    ${newsSection}
+    <button type="button" class="btn btn-ghost day-detail-add-btn" id="day-detail-add-btn">+ Tambah trade di hari ini</button>
+    <button type="button" class="btn btn-ghost day-detail-add-btn" id="day-detail-news-add-btn">📰 + Tambah news di hari ini</button>
   `;
 
   document.getElementById("day-detail-add-btn").addEventListener("click", () => {
     closeDayDetail();
     goToTradeLogAndAddTrade(dateStr);
+  });
+  document.getElementById("day-detail-news-add-btn").addEventListener("click", () => {
+    closeDayDetail();
+    openNewsModal(null, dateStr);
   });
 
   dayDetailContent.querySelectorAll(".day-detail-item").forEach(item => {
@@ -1617,6 +1946,15 @@ function openDayDetail(year, month, day, dayTrades) {
       if (trade) {
         closeDayDetail();
         openTradeDetail(trade);
+      }
+    });
+  });
+  dayDetailContent.querySelectorAll(".day-detail-news-item").forEach(item => {
+    item.addEventListener("click", () => {
+      const news = allNews.find(n => n.id === item.dataset.id);
+      if (news) {
+        closeDayDetail();
+        openNewsModal(news);
       }
     });
   });

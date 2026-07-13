@@ -109,6 +109,17 @@
                 <button type="button" id="cal-next">›</button>
               </div>
             </div>
+
+            <div class="news-toolbar">
+              <button type="button" class="btn-news-add" id="news-add-btn">📰 + Tambah News</button>
+              <select id="news-filter">
+                <option value="all">Semua News</option>
+                <option value="medium">Orange Folder ke atas</option>
+                <option value="high">Red Folder aja</option>
+                <option value="none">Sembunyikan News</option>
+              </select>
+            </div>
+
             <div class="calendar-weekdays">
               <span>Sen</span><span>Sel</span><span>Rab</span><span>Kam</span><span>Jum</span><span>Sab</span><span>Min</span>
             </div>
@@ -289,6 +300,20 @@
             </div>
 
             <div class="field full">
+              <label>Mood Saat Trading</label>
+              <div class="pill-group" id="mood-group" data-mode="single">
+                <button type="button" class="pill" data-value="😌 Tenang">😌 Tenang</button>
+                <button type="button" class="pill" data-value="😀 Percaya Diri">😀 Percaya Diri</button>
+                <button type="button" class="pill" data-value="🧘 Disiplin">🧘 Disiplin</button>
+                <button type="button" class="pill" data-value="😰 Cemas">😰 Cemas</button>
+                <button type="button" class="pill" data-value="🔥 FOMO">🔥 FOMO</button>
+                <button type="button" class="pill" data-value="🤑 Serakah">🤑 Serakah</button>
+                <button type="button" class="pill" data-value="😡 Frustrasi">😡 Frustrasi</button>
+                <button type="button" class="pill" data-value="😴 Malas/Bosan">😴 Malas/Bosan</button>
+              </div>
+            </div>
+
+            <div class="field full">
               <label>HTF Link (boleh lebih dari satu)</label>
               <div id="htf-links-list" class="link-list"></div>
               <button type="button" class="pill-add-btn-full" id="htf-link-add-btn">+ Tambah Link HTF</button>
@@ -439,6 +464,11 @@
             <svg id="result-bar-svg" width="100%" height="140" viewBox="0 0 400 140" preserveAspectRatio="none"></svg>
           </div>
         </div>
+
+        <div class="panel">
+          <h3 style="margin-bottom:16px;">🧠 Smart Insights</h3>
+          <div id="insights-list"></div>
+        </div>
       </section>
 
     </main>
@@ -478,6 +508,38 @@
   <div id="day-detail-overlay" class="modal-overlay hidden">
     <div class="modal detail-modal">
       <div id="day-detail-content"></div>
+    </div>
+  </div>
+
+  <!-- ===================== MODAL TAMBAH NEWS ===================== -->
+  <div id="news-modal-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h2>Tambah News</h2>
+      <div id="news-modal-error" class="error-msg hidden"></div>
+      <form id="news-form">
+        <input type="hidden" id="news-id" />
+        <div class="field">
+          <label>Nama Event</label>
+          <input type="text" id="news-title" required placeholder="Contoh: NFP, FOMC, CPI Release" />
+        </div>
+        <div class="field">
+          <label>Tanggal</label>
+          <input type="date" id="news-date" required />
+        </div>
+        <div class="field">
+          <label>Impact</label>
+          <div class="pill-group" id="news-impact-group" data-mode="single">
+            <button type="button" class="pill impact-low" data-value="low">🟡 Low</button>
+            <button type="button" class="pill impact-medium" data-value="medium">🟠 Medium</button>
+            <button type="button" class="pill impact-high" data-value="high">🔴 Red Folder</button>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost hidden" id="news-delete-btn">Hapus</button>
+          <button type="button" class="btn btn-ghost" id="news-cancel-btn">Batal</button>
+          <button type="submit" class="btn btn-primary" id="news-save-btn">Simpan</button>
+        </div>
+      </form>
     </div>
   </div>
 
