@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Shared Trade | Jurnal Trading</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0d0e12" />
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+<meta name="robots" content="noindex, nofollow" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css" />
+<style>
+  .share-page-wrap {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 16px;
+  }
+  .share-page-header {
+    text-align: center;
+    margin-bottom: 22px;
+  }
+  .share-page-footer {
+    text-align: center;
+    margin-top: 22px;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .share-page-footer a { color: var(--accent); text-decoration: none; font-weight: 600; }
+  .share-page-footer a:hover { text-decoration: underline; }
+  #share-loading, #share-not-found {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 14px;
+    padding: 60px 20px;
+  }
+</style>
+</head>
+<body>
+
+  <div class="share-page-wrap">
+    <div class="share-page-header">
+      <div class="wordmark">JURNAL TRADING</div>
+      <p class="sub" style="margin-top:6px;">Shared trade snapshot</p>
+    </div>
+
+    <div id="share-loading">Lagi ngambil data...</div>
+    <div id="share-not-found" class="hidden">
+      Link ini gak ketemu atau udah dihentikan sama pemiliknya.
+    </div>
+
+    <div id="share-card-wrap" class="hidden" style="width:100%; max-width:600px;">
+      <div class="modal detail-modal" style="width:100%; max-width:600px; max-height:none;">
+        <div id="share-content"></div>
+      </div>
+    </div>
+
+    <div class="share-page-footer">
+      Dibuat pakai <a href="/">Jurnal Trading</a> — jurnal trading pribadi, gratis.
+    </div>
+  </div>
+
+  <script type="module" src="share.js"></script>
+</body>
+</html>

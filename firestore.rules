@@ -7,11 +7,22 @@ service cloud.firestore {
     match /users/{userId}/accounts/{accountId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
+    match /users/{userId}/news/{newsId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
 
     match /access_requests/{uid} {
       allow create: if request.auth != null && request.auth.uid == uid;
       allow read: if request.auth != null && (request.auth.uid == uid || request.auth.uid == "igxAKYsyzqMZOUs3xTl8J42ya333");
       allow update, delete: if request.auth != null && request.auth.uid == "igxAKYsyzqMZOUs3xTl8J42ya333";
+    }
+
+    // Trade yang di-share publik - siapa aja boleh baca (buat link share),
+    // tapi cuma pemiliknya sendiri yang boleh bikin/hapus.
+    match /shared_trades/{shareId} {
+      allow read: if true;
+      allow create: if request.auth != null && request.resource.data.ownerUid == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.ownerUid == request.auth.uid;
     }
   }
 }

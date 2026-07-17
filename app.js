@@ -992,6 +992,82 @@ function closeTradeDetail() {
   tradeDetailContent.innerHTML = "";
 }
 
+// ============================================================
+// SHARE TRADE (link publik, gak perlu login buat lihat)
+// ============================================================
+
+async function handleShareTrade(trade) {
+  const btn = document.getElementById("detail-share-btn");
+  if (trade.shareId) {
+    showShareLinkPanel(trade.shareId);
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Membuat link...";
+
+  try {
+    const publicData = {
+      ownerUid: currentUser.uid,
+      pair: trade.pair || "",
+      position: trade.position || "",
+      date: trade.date || "",
+      htfBias: trade.htfBias || [],
+      confluence: trade.confluence || [],
+      narrative: trade.narrative || "",
+      mood: trade.mood || "",
+      risk: trade.risk ?? null,
+      riskReward: trade.riskReward || "",
+      result: trade.result || "",
+      pnl: trade.pnl ?? 0,
+      htfLinks: trade.htfLinks || (trade.htfLink ? [trade.htfLink] : []),
+      ltfLink: trade.ltfLink || "",
+      screenshotData: trade.screenshotData || null,
+      sharedAt: serverTimestamp(),
+    };
+
+    const ref = await addDoc(collection(db, "shared_trades"), publicData);
+    await updateDoc(doc(db, "users", currentUser.uid, "trades", trade.id), { shareId: ref.id });
+    trade.shareId = ref.id;
+    showShareLinkPanel(ref.id);
+  } catch (err) {
+    alert("Gagal bikin link share. Coba lagi.");
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "🔗 Share";
+  }
+}
+
+function showShareLinkPanel(shareId) {
+  const panel = document.getElementById("share-link-panel");
+  const input = document.getElementById("share-link-input");
+  const url = `${window.location.origin}/share.html?id=${shareId}`;
+  input.value = url;
+  panel.classList.remove("hidden");
+
+  document.getElementById("share-copy-btn").onclick = () => {
+    navigator.clipboard.writeText(url).then(() => {
+      const copyBtn = document.getElementById("share-copy-btn");
+      copyBtn.textContent = "Ke-copy!";
+      setTimeout(() => { copyBtn.textContent = "Copy"; }, 1500);
+    });
+  };
+
+  document.getElementById("share-stop-btn").onclick = async () => {
+    if (!confirm("Hentikan share? Link ini bakal berhenti berfungsi.")) return;
+    try {
+      await deleteDoc(doc(db, "shared_trades", shareId));
+      const trade = allTrades.find(t => t.shareId === shareId);
+      if (trade) await updateDoc(doc(db, "users", currentUser.uid, "trades", trade.id), { shareId: null });
+      panel.classList.add("hidden");
+    } catch (err) {
+      alert("Gagal hentikan share.");
+      console.error(err);
+    }
+  };
+}
+
 function openTradeDetail(trade) {
   const pnlClass = trade.pnl > 0 ? "pos" : (trade.pnl < 0 ? "neg" : "neu");
   const dirClass = trade.position === "Buy" ? "dir-buy" : "dir-sell";
@@ -1080,12 +1156,25 @@ function openTradeDetail(trade) {
       ${screenshotHtml}
     </div>
 
+    <div id="share-link-panel" class="share-link-panel hidden">
+      <div class="share-link-label">Link publik (siapa aja bisa buka tanpa login):</div>
+      <div class="share-link-row">
+        <input type="text" id="share-link-input" readonly />
+        <button type="button" class="btn-copy-link" id="share-copy-btn">Copy</button>
+      </div>
+      <button type="button" class="share-stop-btn" id="share-stop-btn">Hentikan share</button>
+    </div>
+
     <div class="detail-actions">
       <button type="button" class="btn btn-danger" id="detail-delete-btn" style="flex:0;">Hapus</button>
+      <button type="button" class="btn btn-ghost" id="detail-share-btn" style="flex:0;">🔗 Share</button>
       <button type="button" class="btn btn-ghost" id="detail-close-btn">Tutup</button>
       <button type="button" class="btn btn-primary" id="detail-edit-btn">Edit Trade</button>
     </div>
   `;
+
+  document.getElementById("detail-share-btn").addEventListener("click", () => handleShareTrade(trade));
+  if (trade.shareId) showShareLinkPanel(trade.shareId);
 
   document.getElementById("detail-close-btn").addEventListener("click", closeTradeDetail);
   document.getElementById("detail-edit-btn").addEventListener("click", () => {
@@ -2115,3 +2204,14 @@ function refreshCustomSelect(select) {
 }
 
 document.querySelectorAll("select").forEach(enhanceSelect);
+
+// ============================================================
+// PWA: daftarin service worker biar bisa di-"Install" jadi app
+// ============================================================
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/service-worker.js").catch((err) => {
+      console.error("Service worker gagal register:", err);
+    });
+  });
+}
