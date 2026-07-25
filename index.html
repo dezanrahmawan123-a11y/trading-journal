@@ -111,9 +111,18 @@
               </div>
               <div class="month-nav">
                 <button type="button" id="cal-prev">‹</button>
-                <span id="cal-month-label">-</span>
+                <button type="button" id="cal-month-label" class="cal-month-label-btn">-</button>
                 <button type="button" id="cal-next">›</button>
               </div>
+            </div>
+
+            <div id="cal-month-picker" class="cal-month-picker hidden">
+              <div class="cal-picker-year-row">
+                <button type="button" id="cal-picker-year-prev">‹</button>
+                <span id="cal-picker-year-label">2026</span>
+                <button type="button" id="cal-picker-year-next">›</button>
+              </div>
+              <div class="cal-picker-month-grid" id="cal-picker-month-grid"></div>
             </div>
 
             <div class="news-toolbar">
@@ -438,15 +447,15 @@
             <div class="stat-value neu" id="stat-winrate">0%</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Total P&L</div>
+            <div class="stat-label" id="stat-pnl-label">Total P&L</div>
             <div class="stat-value neu" id="stat-pnl">0</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Rata-rata Profit</div>
+            <div class="stat-label" id="stat-avgwin-label">Rata-rata Profit</div>
             <div class="stat-value pos" id="stat-avgwin">0</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Rata-rata Loss</div>
+            <div class="stat-label" id="stat-avgloss-label">Rata-rata Loss</div>
             <div class="stat-value neg" id="stat-avgloss">0</div>
           </div>
         </div>

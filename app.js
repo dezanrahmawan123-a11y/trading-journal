@@ -1479,16 +1479,22 @@ function renderAnalytics(trades) {
   const winRate = total ? (wins.length / total) * 100 : 0;
   const avgWin = wins.length ? wins.reduce((s, t) => s + t.pnl, 0) / wins.length : 0;
   const avgLoss = losses.length ? losses.reduce((s, t) => s + t.pnl, 0) / losses.length : 0;
+  const isBacktest = getCurrentAccount()?.type === "backtest";
+  const unit = isBacktest ? "R" : "";
 
   document.getElementById("stat-total").textContent = total;
   document.getElementById("stat-winrate").textContent = winRate.toFixed(1) + "%";
 
+  document.getElementById("stat-pnl-label").textContent = isBacktest ? "Total R" : "Total P&L";
+  document.getElementById("stat-avgwin-label").textContent = isBacktest ? "Rata-rata R Win" : "Rata-rata Profit";
+  document.getElementById("stat-avgloss-label").textContent = isBacktest ? "Rata-rata R Loss" : "Rata-rata Loss";
+
   const pnlEl = document.getElementById("stat-pnl");
-  pnlEl.textContent = formatNum(totalPnl);
+  pnlEl.textContent = formatNum(totalPnl) + unit;
   pnlEl.className = "stat-value " + (totalPnl > 0 ? "pos" : totalPnl < 0 ? "neg" : "neu");
 
-  document.getElementById("stat-avgwin").textContent = formatNum(avgWin);
-  document.getElementById("stat-avgloss").textContent = formatNum(avgLoss);
+  document.getElementById("stat-avgwin").textContent = formatNum(avgWin) + unit;
+  document.getElementById("stat-avgloss").textContent = formatNum(avgLoss) + unit;
 
   renderGrowthChart(trades);
   renderSymbolDonut(trades);
@@ -1632,7 +1638,7 @@ function renderSymbolDonut(trades) {
         <span class="donut-legend-label">${escapeHtml(seg.label)}</span>
       </div>
       <div style="text-align:right;">
-        <div class="donut-legend-value ${seg.pnl > 0 ? 'pos' : seg.pnl < 0 ? 'neg' : 'neu'}">${formatNum(seg.pnl)}</div>
+        <div class="donut-legend-value ${seg.pnl > 0 ? 'pos' : seg.pnl < 0 ? 'neg' : 'neu'}">${formatNum(seg.pnl)}${getCurrentAccount()?.type === "backtest" ? "R" : ""}</div>
         <div class="donut-legend-sub">${seg.count} trades</div>
       </div>
     </div>
@@ -1932,6 +1938,54 @@ calPrevBtn.addEventListener("click", () => {
 calNextBtn.addEventListener("click", () => {
   calendarViewDate.setMonth(calendarViewDate.getMonth() + 1);
   renderDashboard(getAccountTrades());
+});
+
+// ---------- Month/Year quick picker ----------
+const calMonthPicker = document.getElementById("cal-month-picker");
+const calPickerYearLabel = document.getElementById("cal-picker-year-label");
+const calPickerMonthGrid = document.getElementById("cal-picker-month-grid");
+let pickerYear = calendarViewDate.getFullYear();
+
+function renderMonthPickerGrid() {
+  calPickerYearLabel.textContent = pickerYear;
+  calPickerMonthGrid.innerHTML = "";
+  MONTH_NAMES_ID.forEach((name, i) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "cal-picker-month-btn";
+    if (pickerYear === calendarViewDate.getFullYear() && i === calendarViewDate.getMonth()) {
+      btn.classList.add("cal-picker-month-active");
+    }
+    btn.textContent = name;
+    btn.addEventListener("click", () => {
+      calendarViewDate = new Date(pickerYear, i, 1);
+      calMonthPicker.classList.add("hidden");
+      renderDashboard(getAccountTrades());
+    });
+    calPickerMonthGrid.appendChild(btn);
+  });
+}
+
+calMonthLabel.addEventListener("click", (e) => {
+  e.stopPropagation();
+  pickerYear = calendarViewDate.getFullYear();
+  renderMonthPickerGrid();
+  calMonthPicker.classList.toggle("hidden");
+});
+
+document.getElementById("cal-picker-year-prev").addEventListener("click", () => {
+  pickerYear -= 1;
+  renderMonthPickerGrid();
+});
+document.getElementById("cal-picker-year-next").addEventListener("click", () => {
+  pickerYear += 1;
+  renderMonthPickerGrid();
+});
+
+document.addEventListener("click", (e) => {
+  if (!calMonthPicker.classList.contains("hidden") && !calMonthPicker.contains(e.target) && e.target !== calMonthLabel) {
+    calMonthPicker.classList.add("hidden");
+  }
 });
 
 function getCalendarFilteredTrades(monthTrades) {
