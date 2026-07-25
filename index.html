@@ -198,7 +198,7 @@
             <div class="stat-value neu" id="tl-trades">0</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">BALANCE</div>
+            <div class="stat-label" id="tl-balance-label">BALANCE</div>
             <div class="stat-value neu" id="tl-balance">$0.00</div>
           </div>
         </div>
@@ -489,11 +489,18 @@
       <form id="account-form">
         <div class="field">
           <label>Nama Akun</label>
-          <input type="text" id="account-name" required placeholder="Contoh: Akun Real, Akun Demo" />
+          <input type="text" id="account-name" required placeholder="Contoh: Akun Real, Backtest EURUSD" />
         </div>
-        <div class="field">
+        <div class="field full">
+          <label>Tipe Akun</label>
+          <div class="pill-group" id="account-type-group" data-mode="single">
+            <button type="button" class="pill" data-value="live">💰 Live / Real</button>
+            <button type="button" class="pill" data-value="backtest">🧪 Backtest</button>
+          </div>
+        </div>
+        <div class="field" id="account-balance-field">
           <label>Modal Awal (Starting Balance)</label>
-          <input type="number" step="any" id="account-balance" required placeholder="Contoh: 1000" />
+          <input type="number" step="any" id="account-balance" placeholder="Contoh: 1000" />
         </div>
         <div class="modal-actions">
           <button type="button" class="btn btn-ghost hidden" id="account-cancel-btn">Batal</button>

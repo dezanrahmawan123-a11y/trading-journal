@@ -386,7 +386,8 @@ function renderAccountSwitcher() {
   allAccounts.forEach(acc => {
     const opt = document.createElement("option");
     opt.value = acc.id;
-    opt.textContent = acc.name;
+    const icon = acc.type === "backtest" ? "🧪 " : "💰 ";
+    opt.textContent = icon + acc.name;
     if (acc.id === currentAccountId) opt.selected = true;
     accountSwitcher.appendChild(opt);
   });
@@ -416,8 +417,25 @@ function openAccountModal(isFirst) {
   accountModalDesc.textContent = isFirst
     ? "Bikin akun trading pertama lo. Bisa nambah akun lain lagi nanti (misal Akun Real & Akun Demo)."
     : "Tambah akun trading baru. Trade akan dicatat terpisah per akun.";
+
+  document.querySelectorAll("#account-type-group .pill").forEach(p => p.classList.remove("active"));
+  document.querySelector('#account-type-group .pill[data-value="live"]').classList.add("active");
+  document.getElementById("account-balance-field").classList.remove("hidden");
+  document.getElementById("account-balance").required = true;
+
   accountModalOverlay.classList.remove("hidden");
 }
+
+document.querySelectorAll("#account-type-group .pill").forEach(pill => {
+  pill.addEventListener("click", () => {
+    const isBacktest = pill.dataset.value === "backtest";
+    const balanceField = document.getElementById("account-balance-field");
+    const balanceInput = document.getElementById("account-balance");
+    balanceField.classList.toggle("hidden", isBacktest);
+    balanceInput.required = !isBacktest;
+    if (isBacktest) balanceInput.value = "";
+  });
+});
 
 function closeAccountModal() {
   if (isFirstAccountFlow) return;
@@ -431,8 +449,12 @@ accountForm.addEventListener("submit", async (e) => {
   accountModalError.classList.add("hidden");
 
   const name = document.getElementById("account-name").value.trim();
-  const balance = parseFloat(document.getElementById("account-balance").value);
-  if (!name || isNaN(balance)) {
+  const typePill = document.querySelector("#account-type-group .pill.active");
+  const type = typePill ? typePill.dataset.value : "live";
+  const balanceRaw = document.getElementById("account-balance").value;
+  const balance = type === "backtest" ? 0 : parseFloat(balanceRaw);
+
+  if (!name || (type === "live" && isNaN(balance))) {
     accountModalError.textContent = "Isi nama akun dan modal awal dengan benar.";
     accountModalError.classList.remove("hidden");
     return;
@@ -440,7 +462,7 @@ accountForm.addEventListener("submit", async (e) => {
 
   try {
     const ref = await addDoc(accountsCollection(currentUser.uid), {
-      name, startingBalance: balance, createdAt: serverTimestamp()
+      name, type, startingBalance: balance || 0, createdAt: serverTimestamp()
     });
     currentAccountId = ref.id;
     localStorage.setItem(`journal_account_${currentUser.uid}`, currentAccountId);
@@ -1316,10 +1338,11 @@ document.getElementById("analytics-period").addEventListener("change", renderAll
 function renderTradeLogStats(accountTrades) {
   const total = accountTrades.length;
   const wins = accountTrades.filter(t => t.pnl > 0).length;
+  const losses = accountTrades.filter(t => t.pnl < 0).length;
   const winRate = total ? (wins / total) * 100 : 0;
   const totalPnl = accountTrades.reduce((s, t) => s + t.pnl, 0);
   const account = getCurrentAccount();
-  const balance = (account?.startingBalance || 0) + totalPnl;
+  const isBacktest = account?.type === "backtest";
 
   const pnlEl = document.getElementById("tl-total-pnl");
   pnlEl.textContent = formatMoney(totalPnl);
@@ -1327,7 +1350,15 @@ function renderTradeLogStats(accountTrades) {
 
   document.getElementById("tl-winrate").textContent = winRate.toFixed(0) + "%";
   document.getElementById("tl-trades").textContent = total;
-  document.getElementById("tl-balance").textContent = formatMoney(balance);
+
+  if (isBacktest) {
+    document.getElementById("tl-balance-label").textContent = "WIN / LOSE";
+    document.getElementById("tl-balance").innerHTML = `<span class="pos">${wins}W</span> / <span class="neg">${losses}L</span>`;
+  } else {
+    document.getElementById("tl-balance-label").textContent = "BALANCE";
+    const balance = (account?.startingBalance || 0) + totalPnl;
+    document.getElementById("tl-balance").textContent = formatMoney(balance);
+  }
 }
 
 function renderTable(trades) {
@@ -2121,13 +2152,27 @@ function renderDashboardStats(monthTrades, accountTrades) {
   document.getElementById("dash-rr-footnote").textContent = `${total} trade bulan ini`;
 
   const account = getCurrentAccount();
-  const startingBalance = account?.startingBalance || 0;
-  const allTimePnl = accountTrades.reduce((s, t) => s + t.pnl, 0);
-  const balance = startingBalance + allTimePnl;
+  const isBacktest = account?.type === "backtest";
 
-  document.getElementById("dash-balance-sub").textContent = `SALDO · ${account?.name || "-"}`;
-  document.getElementById("dash-balance").textContent = formatMoney(balance);
-  document.getElementById("dash-balance-footnote").textContent = `Modal awal: ${formatMoney(startingBalance)}`;
+  if (isBacktest) {
+    const allWins = accountTrades.filter(t => t.pnl > 0).length;
+    const allLosses = accountTrades.filter(t => t.pnl < 0).length;
+    const allBes = accountTrades.filter(t => t.pnl === 0).length;
+    const allTotal = accountTrades.length;
+    const allWinRate = allTotal ? (allWins / allTotal) * 100 : 0;
+
+    document.getElementById("dash-balance-sub").textContent = `WIN / LOSE · ${account?.name || "-"}`;
+    document.getElementById("dash-balance").innerHTML = `<span class="pos">${allWins}W</span> / <span class="neg">${allLosses}L</span>`;
+    document.getElementById("dash-balance-footnote").textContent = `${allTotal} total trade · Win rate ${allWinRate.toFixed(0)}% (${allBes} BE)`;
+  } else {
+    const startingBalance = account?.startingBalance || 0;
+    const allTimePnl = accountTrades.reduce((s, t) => s + t.pnl, 0);
+    const balance = startingBalance + allTimePnl;
+
+    document.getElementById("dash-balance-sub").textContent = `SALDO · ${account?.name || "-"}`;
+    document.getElementById("dash-balance").textContent = formatMoney(balance);
+    document.getElementById("dash-balance-footnote").textContent = `Modal awal: ${formatMoney(startingBalance)}`;
+  }
 }
 
 // ============================================================
