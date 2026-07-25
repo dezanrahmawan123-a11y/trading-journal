@@ -853,9 +853,20 @@ function openTradeForm(trade = null, presetDate = null) {
     b.classList.toggle("active", b.dataset.value === pos);
   });
 
-  pnlInput.value = trade?.pnl ?? "";
-  riskInput.value = trade?.risk ?? "";
-  updateRRDisplay();
+  const account = getCurrentAccount();
+  const isBacktest = account?.type === "backtest";
+  document.getElementById("live-pnl-fields").classList.toggle("hidden", isBacktest);
+  document.getElementById("backtest-pnl-fields").classList.toggle("hidden", !isBacktest);
+  pnlInput.required = !isBacktest;
+  document.getElementById("trade-pnl-r").required = isBacktest;
+
+  if (isBacktest) {
+    document.getElementById("trade-pnl-r").value = trade?.pnl ?? "";
+  } else {
+    pnlInput.value = trade?.pnl ?? "";
+    riskInput.value = trade?.risk ?? "";
+    updateRRDisplay();
+  }
 
   renderHtfLinksList(trade?.htfLinks || (trade?.htfLink ? [trade.htfLink] : []));
   document.getElementById("trade-ltf-link").value = trade?.ltfLink || "";
@@ -941,11 +952,32 @@ tradeForm.addEventListener("submit", async (e) => {
   }
 
   const tradeId = document.getElementById("trade-id").value || null;
-  const pnlVal = parseFloat(pnlInput.value);
-  if (isNaN(pnlVal)) {
-    tradeFormError.textContent = "Net P/L harus berupa angka.";
-    tradeFormError.classList.remove("hidden");
-    return;
+  const account = getCurrentAccount();
+  const isBacktest = account?.type === "backtest";
+
+  let pnlVal, riskVal, riskRewardStr;
+
+  if (isBacktest) {
+    pnlVal = parseFloat(document.getElementById("trade-pnl-r").value);
+    if (isNaN(pnlVal)) {
+      tradeFormError.textContent = "Isi hasil trade dalam satuan R (contoh: 2 atau -1).";
+      tradeFormError.classList.remove("hidden");
+      return;
+    }
+    riskVal = 1;
+    riskRewardStr = pnlVal >= 0 ? `1:${pnlVal.toFixed(2)}` : `${pnlVal.toFixed(2)}R`;
+  } else {
+    pnlVal = parseFloat(pnlInput.value);
+    if (isNaN(pnlVal)) {
+      tradeFormError.textContent = "Net P/L harus berupa angka.";
+      tradeFormError.classList.remove("hidden");
+      return;
+    }
+    riskVal = parseOptionalFloat(riskInput.value);
+    riskRewardStr = "";
+    if (riskVal && riskVal > 0) {
+      riskRewardStr = `1:${(Math.abs(pnlVal) / riskVal).toFixed(2)}`;
+    }
   }
 
   let pairValue = pairSelect.value;
@@ -956,12 +988,6 @@ tradeForm.addEventListener("submit", async (e) => {
       tradeFormError.classList.remove("hidden");
       return;
     }
-  }
-
-  const riskVal = parseOptionalFloat(riskInput.value);
-  let riskRewardStr = "";
-  if (riskVal && riskVal > 0) {
-    riskRewardStr = `1:${(Math.abs(pnlVal) / riskVal).toFixed(2)}`;
   }
 
   const resultValues = getActivePillValues("result-group");
@@ -1886,6 +1912,37 @@ calNextBtn.addEventListener("click", () => {
   renderDashboard(getAccountTrades());
 });
 
+function getCalendarFilteredTrades(monthTrades) {
+  const pairQ = document.getElementById("cal-filter-pair").value.trim().toUpperCase();
+  const dirQ = document.getElementById("cal-filter-dir").value;
+  const resultQ = document.getElementById("cal-filter-result").value;
+
+  const resetBtn = document.getElementById("cal-filter-reset");
+  const isActive = pairQ || dirQ || resultQ;
+  resetBtn.classList.toggle("hidden", !isActive);
+
+  if (!isActive) return monthTrades;
+
+  return monthTrades.filter(t => {
+    if (pairQ && !t.pair?.toUpperCase().includes(pairQ)) return false;
+    if (dirQ && t.position !== dirQ) return false;
+    if (resultQ === "win" && t.pnl <= 0) return false;
+    if (resultQ === "loss" && t.pnl > 0) return false;
+    return true;
+  });
+}
+
+["cal-filter-pair", "cal-filter-dir", "cal-filter-result"].forEach(id => {
+  const evt = id === "cal-filter-pair" ? "input" : "change";
+  document.getElementById(id).addEventListener(evt, () => renderDashboard(getAccountTrades()));
+});
+document.getElementById("cal-filter-reset").addEventListener("click", () => {
+  document.getElementById("cal-filter-pair").value = "";
+  document.getElementById("cal-filter-dir").value = "";
+  document.getElementById("cal-filter-result").value = "";
+  renderDashboard(getAccountTrades());
+});
+
 function renderDashboard(accountTrades) {
   const year = calendarViewDate.getFullYear();
   const month = calendarViewDate.getMonth();
@@ -1895,6 +1952,7 @@ function renderDashboard(accountTrades) {
     const d = new Date(t.date + "T00:00:00");
     return d.getFullYear() === year && d.getMonth() === month;
   });
+  const monthTradesForCalendar = getCalendarFilteredTrades(monthTrades);
 
   const visibleNews = getFilteredNews();
   const monthNews = visibleNews.filter(n => {
@@ -1904,9 +1962,9 @@ function renderDashboard(accountTrades) {
   });
 
   calMonthLabel.textContent = `${MONTH_NAMES_ID[month]} ${year}`;
-  calSubtitle.textContent = `${monthTrades.length} trade · ${MONTH_NAMES_ID[month]} ${year}`;
+  calSubtitle.textContent = `${monthTradesForCalendar.length} trade · ${MONTH_NAMES_ID[month]} ${year}`;
 
-  renderCalendarGrid(year, month, monthTrades, monthNews);
+  renderCalendarGrid(year, month, monthTradesForCalendar, monthNews);
   renderRecentTrades(accountTrades);
   renderDashboardStats(monthTrades, accountTrades);
 }

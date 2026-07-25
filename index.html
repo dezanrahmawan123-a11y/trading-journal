@@ -126,6 +126,21 @@
               </select>
             </div>
 
+            <div class="cal-filter-toolbar">
+              <input type="text" id="cal-filter-pair" placeholder="Filter pair..." />
+              <select id="cal-filter-dir">
+                <option value="">Semua posisi</option>
+                <option value="Buy">Buy</option>
+                <option value="Sell">Sell</option>
+              </select>
+              <select id="cal-filter-result">
+                <option value="">Semua hasil</option>
+                <option value="win">Profit aja</option>
+                <option value="loss">Loss aja</option>
+              </select>
+              <button type="button" id="cal-filter-reset" class="cal-filter-reset hidden">✕ Reset</button>
+            </div>
+
             <div class="calendar-weekdays">
               <span>Sen</span><span>Sel</span><span>Rab</span><span>Kam</span><span>Jum</span><span>Sab</span><span>Min</span>
             </div>
@@ -247,10 +262,10 @@
               </div>
             </div>
 
-            <div class="tf-row tf-row-3">
+            <div class="tf-row tf-row-3" id="live-pnl-fields">
               <div class="field">
                 <label>Net P/L ($) *</label>
-                <input type="number" step="any" id="trade-pnl" required placeholder="250.00" />
+                <input type="number" step="any" id="trade-pnl" placeholder="250.00" />
               </div>
               <div class="field">
                 <label>Risk ($)</label>
@@ -259,6 +274,14 @@
               <div class="field">
                 <label>RR (auto)</label>
                 <input type="text" id="trade-rr-display" readonly placeholder="—" />
+              </div>
+            </div>
+
+            <div class="tf-row tf-row-3 hidden" id="backtest-pnl-fields">
+              <div class="field" style="grid-column: 1 / -1;">
+                <label>Hasil (dalam R) *</label>
+                <input type="number" step="any" id="trade-pnl-r" placeholder="Contoh: 2 (menang 2R) atau -1 (kena SL/-1R)" />
+                <p style="font-size:11.5px; color:var(--text-dim); margin-top:6px;">Backtest gak pake dolar — tinggal isi berapa kali risk (R) yang lo dapet/hilang. Loss standar biasanya -1.</p>
               </div>
             </div>
 
