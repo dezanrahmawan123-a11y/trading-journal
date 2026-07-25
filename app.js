@@ -1120,6 +1120,7 @@ function openTradeDetail(trade) {
   const pnlClass = trade.pnl > 0 ? "pos" : (trade.pnl < 0 ? "neg" : "neu");
   const dirClass = trade.position === "Buy" ? "dir-buy" : "dir-sell";
   const resultClass = trade.pnl > 0 ? "result-profit" : (trade.pnl < 0 ? "result-loss" : "result-breakeven");
+  const isBacktest = isAccountBacktest(trade.accountId);
 
   const htfTags = (trade.htfBias || []).length
     ? `<div class="detail-tags">${trade.htfBias.map(v => `<span class="detail-tag">${escapeHtml(v)}</span>`).join("")}</div>`
@@ -1158,15 +1159,15 @@ function openTradeDetail(trade) {
         </div>
       </div>
       <div class="detail-pnl-block">
-        <div class="detail-pnl-label">Net P/L</div>
-        <div class="detail-pnl-value ${pnlClass}">${formatMoney(trade.pnl)}</div>
+        <div class="detail-pnl-label">${isBacktest ? "Hasil (R)" : "Net P/L"}</div>
+        <div class="detail-pnl-value ${pnlClass}">${formatPnl(trade.pnl, isBacktest)}</div>
       </div>
     </div>
 
     <div class="detail-grid">
       <div class="detail-stat">
         <div class="detail-stat-label">Risk</div>
-        <div class="detail-stat-value">${trade.risk ? formatMoney(trade.risk) : "-"}</div>
+        <div class="detail-stat-value">${isBacktest ? "1R (standar)" : (trade.risk ? formatMoney(trade.risk) : "-")}</div>
       </div>
       <div class="detail-stat">
         <div class="detail-stat-label">Risk : Reward</div>
@@ -1290,6 +1291,20 @@ function formatMoney(n) {
   return sign + "$" + Math.abs(n).toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function formatPnl(n, isBacktest) {
+  if (isBacktest) {
+    if (n === null || n === undefined || isNaN(n)) return "0R";
+    const sign = n > 0 ? "+" : "";
+    return `${sign}${Number(n).toFixed(2)}R`;
+  }
+  return formatMoney(n);
+}
+
+function isAccountBacktest(accountId) {
+  const acc = allAccounts.find(a => a.id === accountId);
+  return acc?.type === "backtest";
+}
+
 function escapeHtml(str) {
   const div = document.createElement("div");
   div.textContent = str || "";
@@ -1371,8 +1386,9 @@ function renderTradeLogStats(accountTrades) {
   const isBacktest = account?.type === "backtest";
 
   const pnlEl = document.getElementById("tl-total-pnl");
-  pnlEl.textContent = formatMoney(totalPnl);
+  pnlEl.textContent = formatPnl(totalPnl, isBacktest);
   pnlEl.className = "stat-value " + (totalPnl > 0 ? "pos" : totalPnl < 0 ? "neg" : "neu");
+  document.getElementById("tl-total-pnl-label").textContent = isBacktest ? "TOTAL R" : "TOTAL P&L";
 
   document.getElementById("tl-winrate").textContent = winRate.toFixed(0) + "%";
   document.getElementById("tl-trades").textContent = total;
@@ -1390,6 +1406,7 @@ function renderTradeLogStats(accountTrades) {
 function renderTable(trades) {
   tradesTbody.innerHTML = "";
   emptyState.classList.toggle("hidden", trades.length > 0);
+  const isBacktest = getCurrentAccount()?.type === "backtest";
 
   trades.forEach(t => {
     const tr = document.createElement("tr");
@@ -1408,7 +1425,7 @@ function renderTable(trades) {
       <td><span class="dir-badge ${dirClass}">${t.position || "-"}</span></td>
       <td>${escapeHtml(htfText)}</td>
       <td class="mono">${escapeHtml(t.riskReward || "-")}</td>
-      <td class="mono ${pnlClass}">${formatNum(t.pnl)}</td>
+      <td class="mono ${pnlClass}">${formatNum(t.pnl)}${isBacktest ? "R" : ""}</td>
       <td><span class="result-badge ${resultClass}">${escapeHtml(t.result || "-")}</span></td>
       <td>${escapeHtml(confluenceText)}</td>
       <td>
@@ -1491,7 +1508,10 @@ function renderGrowthChart(trades) {
   svg.innerHTML = "";
 
   const account = getCurrentAccount();
+  const isBacktest = account?.type === "backtest";
   const startingBalance = account?.startingBalance || 0;
+  document.getElementById("growth-title").textContent = isBacktest ? "R GROWTH VIEW" : "TRADE GROWTH VIEW";
+  document.getElementById("growth-subtitle").textContent = isBacktest ? "Cumulative R over time" : "Equity curve over time";
 
   if (trades.length === 0) {
     changeEl.textContent = "-";
@@ -1527,12 +1547,12 @@ function renderGrowthChart(trades) {
   const strokeColor = isUp ? "#34d399" : "#f87171";
 
   changeEl.textContent = changePct !== null
-    ? `${formatMoney(changeAbs)} (${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%)`
-    : formatMoney(changeAbs);
+    ? `${formatPnl(changeAbs, isBacktest)} (${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%)`
+    : formatPnl(changeAbs, isBacktest);
   changeEl.className = "growth-change " + (isUp ? "pos" : "neg");
 
-  startLabel.textContent = `Start · ${formatMoney(startingBalance)}`;
-  endLabel.textContent = `${chrono[chrono.length - 1].date} · ${formatMoney(lastVal)}`;
+  startLabel.textContent = `Start · ${formatPnl(startingBalance, isBacktest)}`;
+  endLabel.textContent = `${chrono[chrono.length - 1].date} · ${formatPnl(lastVal, isBacktest)}`;
 
   // 4 garis grid horizontal + label sumbu Y
   let gridLines = "";
@@ -1541,7 +1561,8 @@ function renderGrowthChart(trades) {
     const val = min + (range * i / tickCount);
     const y = padT + (h - padT - padB) - (i / tickCount) * (h - padT - padB);
     gridLines += `<line x1="${padL}" y1="${y}" x2="${w - padR}" y2="${y}" stroke="#26272e" stroke-width="1" stroke-dasharray="3 4" />`;
-    gridLines += `<text x="${padL - 8}" y="${y + 3}" text-anchor="end" font-size="10" fill="#8b8d97" font-family="monospace">${formatMoney(val).replace(".00", "")}</text>`;
+    const label = isBacktest ? `${val.toFixed(1)}R` : formatMoney(val).replace(".00", "");
+    gridLines += `<text x="${padL - 8}" y="${y + 3}" text-anchor="end" font-size="10" fill="#8b8d97" font-family="monospace">${label}</text>`;
   }
 
   svg.innerHTML = `
@@ -1764,6 +1785,7 @@ function renderSmartInsights(trades) {
   const list = document.getElementById("insights-list");
   const insights = [];
   const MIN_SAMPLE = 3;
+  const isBacktest = getCurrentAccount()?.type === "backtest";
 
   if (trades.length < MIN_SAMPLE) {
     list.innerHTML = `<div class="insight-empty">Minimal ${MIN_SAMPLE} trade dulu biar insight-nya akurat. Terus catat trade lo ya.</div>`;
@@ -1828,7 +1850,7 @@ function renderSmartInsights(trades) {
     if (worst.pnl < 0 && best.day !== worst.day) {
       insights.push({
         icon: "📅",
-        text: `Hari <b>${worst.day}</b> cenderung jadi hari boncos buat lo (total ${formatMoney(worst.pnl)} dari ${worst.count} trade), sedangkan <b>${best.day}</b> paling cuan (${formatMoney(best.pnl)}). Coba lebih hati-hati atau kurangi frekuensi trading di ${worst.day}.`
+        text: `Hari <b>${worst.day}</b> cenderung jadi hari boncos buat lo (total ${formatPnl(worst.pnl, isBacktest)} dari ${worst.count} trade), sedangkan <b>${best.day}</b> paling cuan (${formatPnl(best.pnl, isBacktest)}). Coba lebih hati-hati atau kurangi frekuensi trading di ${worst.day}.`
       });
     }
   }
@@ -1971,6 +1993,7 @@ function renderDashboard(accountTrades) {
 
 function renderCalendarGrid(year, month, monthTrades, monthNews) {
   calendarGrid.innerHTML = "";
+  const isBacktest = getCurrentAccount()?.type === "backtest";
 
   const tradesByDay = {};
   monthTrades.forEach(t => {
@@ -2023,7 +2046,7 @@ function renderCalendarGrid(year, month, monthTrades, monthNews) {
       cell.innerHTML = `
         ${newsDotsHtml}
         <span class="cal-day-num">${day}</span>
-        <span class="cal-day-pnl">${formatNumCompact(pnl)}</span>
+        <span class="cal-day-pnl">${formatNumCompact(pnl)}${isBacktest ? "R" : ""}</span>
         <span class="cal-day-count">${dayTrades.length} trade${dayTrades.length > 1 ? "s" : ""}</span>
       `;
       cell.addEventListener("click", () => openDayDetail(year, month, day, dayTrades, dayNews));
@@ -2056,6 +2079,7 @@ function renderCalendarGrid(year, month, monthTrades, monthNews) {
 function openDayDetail(year, month, day, dayTrades, dayNews) {
   const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
   const dateLabel = `${day} ${MONTH_NAMES_ID[month]} ${year}`;
+  const isBacktest = getCurrentAccount()?.type === "backtest";
   const totalPnl = dayTrades.reduce((s, t) => s + t.pnl, 0);
   const wins = dayTrades.filter(t => t.pnl > 0).length;
   const losses = dayTrades.filter(t => t.pnl < 0).length;
@@ -2069,7 +2093,7 @@ function openDayDetail(year, month, day, dayTrades, dayNews) {
           <span class="dir-badge ${dirClass}">${t.position || "-"}</span>
           <span class="day-detail-item-pair">${escapeHtml(t.pair || "-")}</span>
         </div>
-        <span class="day-detail-item-pnl ${pnlClass}">${formatNum(t.pnl)}</span>
+        <span class="day-detail-item-pnl ${pnlClass}">${formatNum(t.pnl)}${isBacktest ? "R" : ""}</span>
       </div>
     `;
   }).join("");
@@ -2094,8 +2118,8 @@ function openDayDetail(year, month, day, dayTrades, dayNews) {
           <div class="day-detail-sub">${dayTrades.length} trade · ${wins} win / ${losses} loss</div>
         </div>
         <div class="day-detail-pnl">
-          <div class="day-detail-pnl-label">Total P&L</div>
-          <div class="day-detail-pnl-value ${totalPnl > 0 ? 'pos' : totalPnl < 0 ? 'neg' : 'neu'}">${formatMoney(totalPnl)}</div>
+          <div class="day-detail-pnl-label">${isBacktest ? "Total R" : "Total P&L"}</div>
+          <div class="day-detail-pnl-value ${totalPnl > 0 ? 'pos' : totalPnl < 0 ? 'neg' : 'neu'}">${formatPnl(totalPnl, isBacktest)}</div>
         </div>
       </div>
       <div class="day-detail-list">${itemsHtml}</div>
@@ -2151,6 +2175,7 @@ dayDetailOverlay.addEventListener("click", (e) => {
 
 function renderRecentTrades(accountTrades) {
   const recent = [...accountTrades].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 6);
+  const isBacktest = getCurrentAccount()?.type === "backtest";
 
   if (recent.length === 0) {
     recentTradesList.innerHTML = `<div class="recent-empty">Belum ada trade.</div>`;
@@ -2165,7 +2190,7 @@ function renderRecentTrades(accountTrades) {
           <span class="recent-item-pair">${escapeHtml(t.pair || "-")}</span>
           <span class="recent-item-date">${t.date || "-"} · ${escapeHtml(t.position || "-")}</span>
         </div>
-        <span class="recent-item-pnl ${pnlClass}">${formatNum(t.pnl)}</span>
+        <span class="recent-item-pnl ${pnlClass}">${formatNum(t.pnl)}${isBacktest ? "R" : ""}</span>
       </div>
     `;
   }).join("");
@@ -2179,6 +2204,8 @@ function renderRecentTrades(accountTrades) {
 }
 
 function renderDashboardStats(monthTrades, accountTrades) {
+  const account = getCurrentAccount();
+  const isBacktest = account?.type === "backtest";
   const label = `${MONTH_NAMES_ID[calendarViewDate.getMonth()]} ${calendarViewDate.getFullYear()}`;
   const total = monthTrades.length;
   const wins = monthTrades.filter(t => t.pnl > 0);
@@ -2196,21 +2223,18 @@ function renderDashboardStats(monthTrades, accountTrades) {
   const profitSum = wins.reduce((s, t) => s + t.pnl, 0);
   const lossSum = losses.reduce((s, t) => s + t.pnl, 0);
 
-  document.getElementById("dash-pnl-sub").textContent = `P&L BULAN INI · ${label}`;
+  document.getElementById("dash-pnl-sub").textContent = `${isBacktest ? "TOTAL R BULAN INI" : "P&L BULAN INI"} · ${label}`;
   const pnlEl = document.getElementById("dash-pnl");
-  pnlEl.textContent = formatMoney(monthlyPnl);
+  pnlEl.textContent = formatPnl(monthlyPnl, isBacktest);
   pnlEl.className = "stat-value " + (monthlyPnl > 0 ? "pos" : monthlyPnl < 0 ? "neg" : "neu");
-  document.getElementById("dash-profit").textContent = formatMoney(profitSum);
-  document.getElementById("dash-loss").textContent = formatMoney(lossSum);
+  document.getElementById("dash-profit").textContent = formatPnl(profitSum, isBacktest);
+  document.getElementById("dash-loss").textContent = formatPnl(lossSum, isBacktest);
 
   const rrValues = monthTrades.map(t => parseRR(t.riskReward)).filter(v => v !== null);
   const avgRR = rrValues.length ? rrValues.reduce((s, v) => s + v, 0) / rrValues.length : null;
   document.getElementById("dash-rr-sub").textContent = `AVG RISK:REWARD · ${label}`;
   document.getElementById("dash-rr").textContent = avgRR !== null ? `1:${avgRR.toFixed(1)}` : "-";
   document.getElementById("dash-rr-footnote").textContent = `${total} trade bulan ini`;
-
-  const account = getCurrentAccount();
-  const isBacktest = account?.type === "backtest";
 
   if (isBacktest) {
     const allWins = accountTrades.filter(t => t.pnl > 0).length;
