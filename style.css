@@ -645,6 +645,7 @@ td.mono, th.mono { font-family: var(--font-mono); }
 .month-nav button {
   background: var(--panel-2);
   border: 1px solid var(--border);
+  outline: none;
   color: var(--text);
   width: 26px; height: 26px;
   border-radius: 50%;
@@ -655,6 +656,7 @@ td.mono, th.mono { font-family: var(--font-mono); }
 }
 .month-nav button:hover { border-color: var(--accent); color: var(--accent); }
 .month-nav button:active { transform: scale(0.92); }
+.month-nav button:focus { outline: none; }
 .month-nav span { color: var(--text); font-weight: 700; min-width: 60px; text-align: center; }
 
 .calendar-weekdays {
@@ -1554,6 +1556,10 @@ td.mono, th.mono { font-family: var(--font-mono); }
 .cal-month-label-btn {
   background: none;
   border: none;
+  outline: none;
+  box-shadow: none;
+  -webkit-appearance: none;
+  appearance: none;
   color: var(--text);
   font-weight: 700;
   min-width: 60px;
@@ -1566,6 +1572,12 @@ td.mono, th.mono { font-family: var(--font-mono); }
   transition: background .15s, color .15s;
 }
 .cal-month-label-btn:hover { background: var(--panel-2); color: var(--accent); }
+.cal-month-label-btn:focus, .cal-month-label-btn:active {
+  outline: none;
+  box-shadow: none;
+  background: var(--panel-2);
+}
+.cal-month-label-btn::-moz-focus-inner { border: 0; }
 
 .cal-month-picker {
   background: var(--panel-2);
