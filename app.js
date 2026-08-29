@@ -145,6 +145,17 @@ authToggleBtn.addEventListener("click", () => {
   }
 });
 
+// ---------- Landing page: tombol CTA scroll ke form ----------
+function goToAuthForm(wantRegister) {
+  if (wantRegister && !isRegisterMode) authToggleBtn.click();
+  if (!wantRegister && isRegisterMode) authToggleBtn.click();
+  document.getElementById("landing-auth-anchor").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+document.getElementById("landing-start-btn").addEventListener("click", () => goToAuthForm(true));
+document.getElementById("landing-login-btn").addEventListener("click", () => goToAuthForm(false));
+document.getElementById("landing-menu-btn").addEventListener("click", () => goToAuthForm(false));
+
 authForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   authError.classList.add("hidden");

@@ -657,16 +657,18 @@ td.mono, th.mono { font-family: var(--font-mono); }
 }
 
 .month-nav {
-  display: flex;
+  display: flex !important;
+  flex-direction: row !important;
   align-items: center;
-  gap: 10px;
-  flex-wrap: nowrap;
+  gap: 8px;
+  flex-wrap: nowrap !important;
+  white-space: nowrap;
   font-family: var(--font-mono);
   font-size: 13px;
   color: var(--text-dim);
 }
-.month-nav button { flex-shrink: 0; }
-.cal-month-label-btn { flex-shrink: 0; }
+.month-nav button { flex-shrink: 0 !important; }
+.cal-month-label-btn { flex-shrink: 0 !important; white-space: nowrap !important; }
 .month-nav button {
   background: var(--panel-2);
   border: 1px solid var(--border);
@@ -1725,4 +1727,284 @@ button, .csel-trigger, .tab-btn, .pill, a {
     font-size: 10.5px;
     padding: 6px 10px;
   }
+}
+
+/* ============================================================
+   LANDING PAGE (sebelum login) - tema hijau neon ala referensi
+   ============================================================ */
+.landing-shell {
+  display: block;
+  min-height: 100vh;
+  padding: 0;
+  align-items: unset;
+  justify-content: unset;
+  background: var(--bg);
+  --lg: #baff29;
+  --lg-soft: rgba(186,255,41,0.12);
+}
+
+.landing-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 22px 24px;
+}
+.landing-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 17px;
+  color: var(--text);
+}
+.landing-logo-icon {
+  width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  font-size: 13px;
+}
+.landing-logo .accent-text { color: var(--lg); }
+.landing-logo-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--lg);
+  box-shadow: 0 0 8px var(--lg);
+  margin-left: 2px;
+}
+.landing-menu-btn {
+  width: 38px; height: 38px;
+  border-radius: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 15px;
+}
+.landing-menu-btn:hover { border-color: var(--lg); color: var(--lg); }
+
+.landing-hero {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 30px 24px 60px;
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  gap: 48px;
+  align-items: center;
+}
+.landing-eyebrow {
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--text-dim);
+  margin-bottom: 14px;
+}
+.landing-h1 {
+  font-family: var(--font-display);
+  font-size: 44px;
+  line-height: 1.12;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin-bottom: 18px;
+}
+.landing-h1 .accent-text { color: var(--lg); }
+.landing-hero-sub {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-dim);
+  max-width: 460px;
+  margin-bottom: 28px;
+}
+.landing-cta-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.btn-landing-primary {
+  background: var(--lg);
+  color: #0a0f06;
+  border: none;
+  border-radius: 10px;
+  padding: 13px 24px;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(186,255,41,0.25);
+  transition: opacity .15s;
+}
+.btn-landing-primary:hover { opacity: 0.9; }
+.btn-landing-ghost {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 13px 24px;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color .15s;
+}
+.btn-landing-ghost:hover { border-color: var(--lg); color: var(--lg); }
+
+/* ---------- Demo dashboard preview ---------- */
+.landing-dash-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 22px;
+  box-shadow: var(--shadow-hard);
+}
+.landing-dash-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+.landing-dash-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+.landing-demo-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.landing-demo-card {
+  background: var(--panel-2);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 14px;
+}
+.landing-demo-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+.landing-dot-live {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--lg);
+  box-shadow: 0 0 6px var(--lg);
+}
+.landing-demo-balance {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--text);
+}
+.landing-demo-change {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  margin-top: 2px;
+  margin-bottom: 12px;
+}
+.landing-demo-change.pos { color: var(--lg); }
+.landing-demo-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.landing-demo-stats div {
+  background: var(--bg);
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  padding: 7px 9px;
+}
+.landing-demo-stats span {
+  display: block;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .4px;
+  color: var(--text-dim);
+  margin-bottom: 3px;
+}
+.landing-demo-stats b {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--text);
+}
+.landing-dash-footnote {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-top: 14px;
+  text-align: center;
+}
+
+/* ---------- Features ---------- */
+.landing-features {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 40px 24px 60px;
+  text-align: center;
+}
+.landing-h2 {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 800;
+  margin-bottom: 34px;
+  letter-spacing: -0.01em;
+}
+.landing-feature-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  text-align: left;
+}
+.landing-feature-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 22px;
+  transition: border-color .15s;
+}
+.landing-feature-card:hover { border-color: var(--lg); }
+.landing-feature-card h4 {
+  font-family: var(--font-display);
+  font-size: 14.5px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+}
+.landing-feature-card h4 span { color: var(--lg); }
+.landing-feature-card p {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+/* ---------- Auth anchor (form login/daftar) ---------- */
+.landing-auth-anchor {
+  display: flex;
+  justify-content: center;
+  padding: 20px 24px 70px;
+  scroll-margin-top: 30px;
+}
+.landing-auth-anchor .auth-card { margin: 0 auto; }
+
+.landing-footer {
+  text-align: center;
+  padding: 24px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  border-top: 1px solid var(--border-soft);
+}
+
+@media (max-width: 900px) {
+  .landing-hero { grid-template-columns: 1fr; padding-top: 10px; }
+  .landing-h1 { font-size: 32px; }
+  .landing-feature-grid { grid-template-columns: 1fr; }
+  .landing-demo-stats b { font-size: 11px; }
 }
