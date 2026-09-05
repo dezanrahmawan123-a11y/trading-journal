@@ -1,21 +1,21 @@
 :root {
-  --bg: #1A3636;
-  --panel: #24413c;
-  --panel-2: #2c4c45;
-  --border: #4a625a;
-  --border-soft: #2f4a44;
-  --text: #f2ead9;
-  --text-dim: #a3b8ac;
-  --accent: #D6BD98;
-  --accent-soft: rgba(214,189,152,0.16);
-  --magenta: #677D6A;
-  --magenta-soft: rgba(103,125,106,0.22);
-  --green: #9ed9a0;
-  --green-soft: rgba(158,217,160,0.14);
-  --red: #d98a6f;
-  --red-soft: rgba(217,138,111,0.16);
-  --amber: #d9a441;
-  --amber-soft: rgba(217,164,65,0.16);
+  --bg: #092634;
+  --panel: #0d3245;
+  --panel-2: #123f54;
+  --border: #1c4a5e;
+  --border-soft: #123344;
+  --text: #f9f9f9;
+  --text-dim: #8fa8b3;
+  --accent: #FF6E42;
+  --accent-soft: rgba(255,110,66,0.16);
+  --magenta: #3a9fd0;
+  --magenta-soft: rgba(0,78,114,0.35);
+  --green: #6fd68f;
+  --green-soft: rgba(111,214,143,0.14);
+  --red: #f2545b;
+  --red-soft: rgba(242,84,91,0.16);
+  --amber: #f2c14e;
+  --amber-soft: rgba(242,193,78,0.16);
   --radius: 14px;
   --radius-sm: 10px;
   --shadow-hard: 0 20px 50px rgba(0,0,0,0.35);
@@ -31,8 +31,8 @@
 
 body {
   background:
-    radial-gradient(ellipse 900px 500px at 20% -10%, rgba(214,189,152,0.08), transparent 60%),
-    radial-gradient(ellipse 700px 500px at 100% 10%, rgba(103,125,106,0.10), transparent 60%),
+    radial-gradient(ellipse 900px 500px at 20% -10%, rgba(255,110,66,0.08), transparent 60%),
+    radial-gradient(ellipse 700px 500px at 100% 10%, rgba(0,78,114,0.18), transparent 60%),
     var(--bg);
   color: var(--text);
   font-family: var(--font-ui);
