@@ -16,129 +16,39 @@
 </head>
 <body>
 
-  <!-- ===================== LANDING + AUTH SCREEN ===================== -->
-  <div id="auth-shell" class="auth-shell landing-shell">
+  <!-- ===================== AUTH SCREEN ===================== -->
+  <div id="auth-shell" class="auth-shell">
+    <div class="auth-card">
+      <div class="wordmark">JURNAL TRADING</div>
+      <h1 id="auth-title">Masuk ke akun</h1>
+      <p class="sub" id="auth-sub">Catat & analisa trade lo di satu tempat.</p>
 
-    <nav class="landing-nav">
-      <div class="landing-logo">
-        <span class="landing-logo-icon">📊</span>
-        <span>Jurnal<span class="accent-text">Trading</span></span>
-        <span class="landing-logo-dot"></span>
+      <div id="auth-error" class="error-msg hidden"></div>
+      <div id="auth-success" class="success-msg hidden"></div>
+
+      <form id="auth-form">
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="auth-email" required placeholder="kamu@email.com" />
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="auth-password" required placeholder="Minimal 6 karakter" />
+        </div>
+        <button type="submit" class="btn btn-primary" id="auth-submit-btn">Masuk</button>
+      </form>
+
+      <div class="auth-toggle" id="forgot-password-row">
+        <button id="forgot-password-btn">Lupa password?</button>
       </div>
-      <button class="landing-menu-btn" id="landing-menu-btn" aria-label="Menu">☰</button>
-    </nav>
 
-    <section class="landing-hero">
-      <div class="landing-hero-left">
-        <div class="landing-eyebrow">PERSONAL TRADING JOURNAL</div>
-        <h1 class="landing-h1">Ubah tiap trade jadi<br /><span class="accent-text">keputusan yang lebih baik.</span></h1>
-        <p class="landing-hero-sub">Catat trade, review performa, pahami emosi, dan bangun konsistensi — semua dari satu jurnal trading pribadi.</p>
-        <div class="landing-cta-row">
-          <button class="btn-landing-primary" id="landing-start-btn">Mulai Jurnal</button>
-          <button class="btn-landing-ghost" id="landing-login-btn">Sudah punya akun</button>
-        </div>
+      <div class="auth-toggle">
+        <span id="auth-toggle-text">Belum punya akun?</span>
+        <button id="auth-toggle-btn">Daftar sekarang</button>
       </div>
-
-      <div class="landing-hero-right">
-        <div class="landing-dash-card">
-          <div class="landing-dash-label">SAMPLE DASHBOARD</div>
-          <div class="landing-dash-title">Account Overview</div>
-
-          <div class="landing-demo-cards">
-            <div class="landing-demo-card">
-              <div class="landing-demo-card-header">
-                <span>DEMO ACCOUNT 01</span>
-                <span class="landing-dot-live"></span>
-              </div>
-              <div class="landing-demo-balance">$5,175.23</div>
-              <div class="landing-demo-change pos">+$175.23 · +3.50%</div>
-              <div class="landing-demo-stats">
-                <div><span>WIN RATE</span><b>64.21%</b></div>
-                <div><span>PROFIT FACTOR</span><b>1.84</b></div>
-                <div><span>AVERAGE RR</span><b>2.31</b></div>
-                <div><span>TOTAL TRADES</span><b>38</b></div>
-              </div>
-            </div>
-
-            <div class="landing-demo-card">
-              <div class="landing-demo-card-header">
-                <span>DEMO ACCOUNT 02</span>
-                <span class="landing-dot-live"></span>
-              </div>
-              <div class="landing-demo-balance">$10,840.60</div>
-              <div class="landing-demo-change pos">+$840.60 · +8.41%</div>
-              <div class="landing-demo-stats">
-                <div><span>WIN RATE</span><b>58.33%</b></div>
-                <div><span>PROFIT FACTOR</span><b>1.67</b></div>
-                <div><span>AVERAGE RR</span><b>1.92</b></div>
-                <div><span>TOTAL TRADES</span><b>72</b></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="landing-dash-footnote">Demo data cuma ilustrasi, bukan data akun beneran.</div>
-        </div>
-      </div>
-    </section>
-
-    <section class="landing-features">
-      <div class="landing-eyebrow" style="text-align:center;">INSIDE JURNAL TRADING</div>
-      <h2 class="landing-h2">Semua yang lo butuh buat review trading lo.</h2>
-
-      <div class="landing-feature-grid">
-        <div class="landing-feature-card">
-          <h4>Trading Journal <span>›</span></h4>
-          <p>Catat konteks lengkap di tiap eksekusi — pair, setup, confluence, sampai screenshot.</p>
-        </div>
-        <div class="landing-feature-card">
-          <h4>Analytics <span>›</span></h4>
-          <p>Ubah histori jurnal jadi feedback terukur: win rate, equity curve, sampai insight otomatis.</p>
-        </div>
-        <div class="landing-feature-card">
-          <h4>Emotion Tracking <span>›</span></h4>
-          <p>Hubungin mindset lo sama keputusan trading — biar tau pola emosi yang bikin untung/rugi.</p>
-        </div>
-        <div class="landing-feature-card">
-          <h4>Cloud Sync <span>›</span></h4>
-          <p>Jurnal lo ikut ke akun manapun lo login, aman tersimpan di cloud.</p>
-        </div>
-      </div>
-    </section>
-
-    <section class="landing-auth-anchor" id="landing-auth-anchor">
-      <div class="auth-card">
-        <div class="wordmark">JURNAL TRADING</div>
-        <h1 id="auth-title">Masuk ke akun</h1>
-        <p class="sub" id="auth-sub">Catat & analisa trade lo di satu tempat.</p>
-
-        <div id="auth-error" class="error-msg hidden"></div>
-        <div id="auth-success" class="success-msg hidden"></div>
-
-        <form id="auth-form">
-          <div class="field">
-            <label>Email</label>
-            <input type="email" id="auth-email" required placeholder="kamu@email.com" />
-          </div>
-          <div class="field">
-            <label>Password</label>
-            <input type="password" id="auth-password" required placeholder="Minimal 6 karakter" />
-          </div>
-          <button type="submit" class="btn btn-primary" id="auth-submit-btn">Masuk</button>
-        </form>
-
-        <div class="auth-toggle" id="forgot-password-row">
-          <button id="forgot-password-btn">Lupa password?</button>
-        </div>
-
-        <div class="auth-toggle">
-          <span id="auth-toggle-text">Belum punya akun?</span>
-          <button id="auth-toggle-btn">Daftar sekarang</button>
-        </div>
-      </div>
-    </section>
-
-    <footer class="landing-footer">Jurnal Trading · Personal trading journal</footer>
+    </div>
   </div>
+
 
 
   <!-- ===================== MENUNGGU PERSETUJUAN ===================== -->
