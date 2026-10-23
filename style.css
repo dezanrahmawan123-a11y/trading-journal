@@ -1,21 +1,21 @@
 :root {
-  --bg: #092634;
-  --panel: #0d3245;
-  --panel-2: #123f54;
-  --border: #1c4a5e;
-  --border-soft: #123344;
-  --text: #f9f9f9;
-  --text-dim: #8fa8b3;
-  --accent: #FF6E42;
-  --accent-soft: rgba(255,110,66,0.16);
-  --magenta: #3a9fd0;
-  --magenta-soft: rgba(0,78,114,0.35);
-  --green: #6fd68f;
-  --green-soft: rgba(111,214,143,0.14);
-  --red: #f2545b;
-  --red-soft: rgba(242,84,91,0.16);
-  --amber: #f2c14e;
-  --amber-soft: rgba(242,193,78,0.16);
+  --bg: #06141B;
+  --panel: #11212D;
+  --panel-2: #192B38;
+  --border: #253745;
+  --border-soft: #1A2932;
+  --text: #CCD0CF;
+  --text-dim: #9BA8AB;
+  --accent: #4A5C6A;
+  --accent-soft: rgba(74,92,106,0.22);
+  --magenta: #9BA8AB;
+  --magenta-soft: rgba(155,168,171,0.14);
+  --green: #34d399;
+  --green-soft: rgba(52,211,153,0.12);
+  --red: #f87171;
+  --red-soft: rgba(248,113,113,0.12);
+  --amber: #fbbf24;
+  --amber-soft: rgba(251,191,36,0.12);
   --radius: 14px;
   --radius-sm: 10px;
   --shadow-hard: 0 20px 50px rgba(0,0,0,0.35);
@@ -31,8 +31,8 @@
 
 body {
   background:
-    radial-gradient(ellipse 900px 500px at 20% -10%, rgba(255,110,66,0.08), transparent 60%),
-    radial-gradient(ellipse 700px 500px at 100% 10%, rgba(0,78,114,0.18), transparent 60%),
+    radial-gradient(ellipse 900px 500px at 20% -10%, rgba(74,92,106,0.18), transparent 60%),
+    radial-gradient(ellipse 700px 500px at 100% 10%, rgba(155,168,171,0.08), transparent 60%),
     var(--bg);
   color: var(--text);
   font-family: var(--font-ui);
@@ -91,6 +91,20 @@ h1, h2, h3 { font-family: var(--font-display); letter-spacing: 1px; }
   align-items: center;
   gap: 8px;
 }
+
+.brand-glyph {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  overflow: visible;
+}
+.brand-glyph-j {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 29px;
+  fill: currentColor;
+}
+.brand-spark { fill: currentColor; opacity: .85; }
 
 
 .auth-card h1 {
@@ -160,7 +174,7 @@ h1, h2, h3 { font-family: var(--font-display); letter-spacing: 1px; }
   width: 100%;
   letter-spacing: 1.5px;
 }
-.btn-primary:hover { opacity: 0.9; box-shadow: 0 6px 18px rgba(108,123,255,0.25); }
+.btn-primary:hover { opacity: 0.9; box-shadow: 0 6px 18px rgba(74,92,106,0.35); }
 
 .btn-ghost { background: var(--panel-2); color: var(--text); }
 .btn-ghost:hover { background: var(--panel-2); }
@@ -657,18 +671,16 @@ td.mono, th.mono { font-family: var(--font-mono); }
 }
 
 .month-nav {
-  display: flex !important;
-  flex-direction: row !important;
+  display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: nowrap !important;
-  white-space: nowrap;
+  gap: 10px;
+  flex-wrap: nowrap;
   font-family: var(--font-mono);
   font-size: 13px;
   color: var(--text-dim);
 }
-.month-nav button { flex-shrink: 0 !important; }
-.cal-month-label-btn { flex-shrink: 0 !important; white-space: nowrap !important; }
+.month-nav button { flex-shrink: 0; }
+.cal-month-label-btn { flex-shrink: 0; }
 .month-nav button {
   background: var(--panel-2);
   border: 1px solid var(--border);
@@ -1728,4 +1740,3 @@ button, .csel-trigger, .tab-btn, .pill, a {
     padding: 6px 10px;
   }
 }
-
