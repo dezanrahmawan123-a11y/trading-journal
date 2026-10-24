@@ -40,6 +40,9 @@ let unsubscribeAccessRequest = null;
 let unsubscribeAdminRequests = null;
 let unsubscribeNews = null;
 let allNews = [];
+let unsubscribeStudy = null;
+let allStudy = [];
+let isAdminUser = false;
 let calendarViewDate = new Date();
 let isFirstAccountFlow = false;
 
@@ -67,6 +70,7 @@ const tabContents = {
   dashboard: document.getElementById("tab-dashboard"),
   tradelog: document.getElementById("tab-tradelog"),
   analytics: document.getElementById("tab-analytics"),
+  study: document.getElementById("tab-study"),
 };
 
 // ---------- DOM refs: trade log ----------
@@ -282,6 +286,10 @@ onAuthStateChanged(auth, (user) => {
     authShell.classList.add("hidden");
     userEmailEl.textContent = user.email;
 
+    isAdminUser = user.uid === ADMIN_UID;
+    studyAddBtn.classList.toggle("hidden", !isAdminUser);
+    studyEmptyAdminHint.classList.toggle("hidden", !isAdminUser);
+
     if (user.uid === ADMIN_UID) {
       pendingShell.classList.add("hidden");
       appShell.classList.remove("hidden");
@@ -289,6 +297,7 @@ onAuthStateChanged(auth, (user) => {
       subscribeToAccounts(user.uid);
       subscribeToTrades(user.uid);
       subscribeToNews(user.uid);
+      subscribeToStudy();
     } else {
       adminApprovalBtn.classList.add("hidden");
       unsubscribeAccessRequest = onSnapshot(doc(db, "access_requests", user.uid), (snap) => {
@@ -299,6 +308,7 @@ onAuthStateChanged(auth, (user) => {
           subscribeToAccounts(user.uid);
           subscribeToTrades(user.uid);
           subscribeToNews(user.uid);
+          subscribeToStudy();
         } else {
           appShell.classList.add("hidden");
           pendingShell.classList.remove("hidden");
@@ -314,9 +324,12 @@ onAuthStateChanged(auth, (user) => {
     if (unsubscribeAccessRequest) unsubscribeAccessRequest();
     if (unsubscribeAdminRequests) unsubscribeAdminRequests();
     if (unsubscribeNews) unsubscribeNews();
+    if (unsubscribeStudy) unsubscribeStudy();
     allTrades = [];
     allAccounts = [];
+    allStudy = [];
     currentAccountId = null;
+    isAdminUser = false;
   }
 });
 
@@ -589,6 +602,149 @@ function getFilteredNews() {
   if (level === "high") return allNews.filter(n => n.impact === "high");
   if (level === "medium") return allNews.filter(n => n.impact === "medium" || n.impact === "high");
   return allNews;
+}
+
+// ============================================================
+// FIRESTORE: STUDY (materi belajar - global, cuma admin yang bisa nulis)
+// ============================================================
+
+function studyCollection() {
+  return collection(db, "study_materials");
+}
+
+function subscribeToStudy() {
+  const q = query(studyCollection(), orderBy("createdAt", "desc"));
+  unsubscribeStudy = onSnapshot(q, (snapshot) => {
+    allStudy = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderStudy();
+  }, (err) => console.error(err));
+}
+
+async function saveStudy(data, studyId) {
+  if (studyId) {
+    await updateDoc(doc(db, "study_materials", studyId), data);
+  } else {
+    await addDoc(studyCollection(), { ...data, createdAt: serverTimestamp() });
+  }
+}
+
+async function removeStudy(studyId) {
+  await deleteDoc(doc(db, "study_materials", studyId));
+}
+
+const studyGrid = document.getElementById("study-grid");
+const studyEmptyState = document.getElementById("study-empty-state");
+const studyEmptyAdminHint = document.getElementById("study-empty-admin-hint");
+const studyAddBtn = document.getElementById("study-add-btn");
+const studyModalOverlay = document.getElementById("study-modal-overlay");
+const studyModalTitle = document.getElementById("study-modal-title");
+const studyModalError = document.getElementById("study-modal-error");
+const studyForm = document.getElementById("study-form");
+const studyUrlLabel = document.getElementById("study-url-label");
+const studyCancelBtn = document.getElementById("study-cancel-btn");
+const studyDeleteBtn = document.getElementById("study-delete-btn");
+
+const STUDY_TYPE_LABEL = { pdf: "📄 PDF", video: "🎥 Video", link: "🔗 Link" };
+
+function getYouTubeId(url) {
+  if (!url) return null;
+  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
+
+function openStudyModal(item = null) {
+  studyForm.reset();
+  studyModalError.classList.add("hidden");
+  document.getElementById("study-id").value = item?.id || "";
+  document.getElementById("study-title").value = item?.title || "";
+  document.getElementById("study-url").value = item?.url || "";
+  document.getElementById("study-description").value = item?.description || "";
+  document.querySelectorAll("#study-type-group .pill").forEach(p => p.classList.remove("active"));
+  const typePill = document.querySelector(`#study-type-group .pill[data-value="${item?.type || "pdf"}"]`);
+  if (typePill) typePill.classList.add("active");
+  studyModalTitle.textContent = item ? "Edit Materi" : "Tambah Materi";
+  studyDeleteBtn.classList.toggle("hidden", !item);
+  studyModalOverlay.classList.remove("hidden");
+}
+
+function closeStudyModal() {
+  studyModalOverlay.classList.add("hidden");
+}
+
+studyAddBtn.addEventListener("click", () => openStudyModal());
+studyCancelBtn.addEventListener("click", closeStudyModal);
+studyModalOverlay.addEventListener("click", (e) => { if (e.target === studyModalOverlay) closeStudyModal(); });
+
+studyForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  studyModalError.classList.add("hidden");
+
+  const studyId = document.getElementById("study-id").value || null;
+  const title = document.getElementById("study-title").value.trim();
+  const url = document.getElementById("study-url").value.trim();
+  const description = document.getElementById("study-description").value.trim();
+  const typePill = document.querySelector("#study-type-group .pill.active");
+  const type = typePill ? typePill.dataset.value : "pdf";
+
+  if (!title || !url) {
+    studyModalError.textContent = "Isi judul dan link/URL materinya.";
+    studyModalError.classList.remove("hidden");
+    return;
+  }
+
+  try {
+    await saveStudy({ title, url, description, type }, studyId);
+    closeStudyModal();
+  } catch (err) {
+    studyModalError.textContent = "Gagal menyimpan. Coba lagi.";
+    studyModalError.classList.remove("hidden");
+    console.error(err);
+  }
+});
+
+studyDeleteBtn.addEventListener("click", async () => {
+  const studyId = document.getElementById("study-id").value;
+  if (studyId && confirm("Hapus materi ini?")) {
+    await removeStudy(studyId);
+    closeStudyModal();
+  }
+});
+
+function renderStudy() {
+  studyGrid.innerHTML = "";
+  studyEmptyState.classList.toggle("hidden", allStudy.length > 0);
+
+  allStudy.forEach(item => {
+    const card = document.createElement("div");
+    card.className = "study-card";
+
+    const ytId = item.type === "video" ? getYouTubeId(item.url) : null;
+
+    card.innerHTML = `
+      <div class="study-card-top">
+        <span class="study-card-type">${STUDY_TYPE_LABEL[item.type] || "🔗 Link"}</span>
+        ${isAdminUser ? `
+          <div class="study-card-actions">
+            <button type="button" class="study-edit-btn" title="Edit">✎</button>
+            <button type="button" class="study-del-btn" title="Hapus">✕</button>
+          </div>
+        ` : ""}
+      </div>
+      <h4>${escapeHtml(item.title || "")}</h4>
+      ${item.description ? `<p>${escapeHtml(item.description)}</p>` : ""}
+      ${ytId ? `<div class="study-card-embed"><iframe src="https://www.youtube.com/embed/${ytId}" title="${escapeHtml(item.title || "")}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>` : ""}
+      ${!ytId ? `<a class="study-card-open" href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener noreferrer">Buka ${item.type === "pdf" ? "PDF" : item.type === "video" ? "Video" : "Link"} ↗</a>` : `<a class="study-card-open" href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener noreferrer">Buka di YouTube ↗</a>`}
+    `;
+
+    if (isAdminUser) {
+      card.querySelector(".study-edit-btn").addEventListener("click", () => openStudyModal(item));
+      card.querySelector(".study-del-btn").addEventListener("click", async () => {
+        if (confirm("Hapus materi ini?")) await removeStudy(item.id);
+      });
+    }
+
+    studyGrid.appendChild(card);
+  });
 }
 
 async function saveTrade(tradeData, tradeId) {
@@ -1504,7 +1660,7 @@ function renderAnalytics(trades) {
   renderSmartInsights(trades);
 }
 
-const CHART_PALETTE = ["#FF6E42", "#3a9fd0", "#6fd68f", "#f2c14e", "#f2545b", "#8fb8c9", "#c48fd9", "#e0aaff"];
+const CHART_PALETTE = ["#7c6cff", "#34d399", "#ffb648", "#f87171", "#4cc9f0", "#f72585", "#80ed99", "#e0aaff"];
 
 function renderGrowthChart(trades) {
   const svg = document.getElementById("growth-svg");
@@ -1524,7 +1680,7 @@ function renderGrowthChart(trades) {
     changeEl.className = "growth-change neu";
     startLabel.textContent = "-";
     endLabel.textContent = "-";
-    svg.innerHTML = `<text x="500" y="90" text-anchor="middle" fill="#8fa8b3" font-size="13">Belum ada data trade</text>`;
+    svg.innerHTML = `<text x="500" y="90" text-anchor="middle" fill="#8b8d97" font-size="13">Belum ada data trade</text>`;
     return;
   }
 
@@ -1550,7 +1706,7 @@ function renderGrowthChart(trades) {
   const changeAbs = lastVal - startingBalance;
   const changePct = startingBalance > 0 ? (changeAbs / startingBalance) * 100 : null;
   const isUp = changeAbs >= 0;
-  const strokeColor = isUp ? "#6fd68f" : "#f2545b";
+  const strokeColor = isUp ? "#34d399" : "#f87171";
 
   changeEl.textContent = changePct !== null
     ? `${formatPnl(changeAbs, isBacktest)} (${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%)`
@@ -1566,9 +1722,9 @@ function renderGrowthChart(trades) {
   for (let i = 0; i <= tickCount; i++) {
     const val = min + (range * i / tickCount);
     const y = padT + (h - padT - padB) - (i / tickCount) * (h - padT - padB);
-    gridLines += `<line x1="${padL}" y1="${y}" x2="${w - padR}" y2="${y}" stroke="#123344" stroke-width="1" stroke-dasharray="3 4" />`;
+    gridLines += `<line x1="${padL}" y1="${y}" x2="${w - padR}" y2="${y}" stroke="#26272e" stroke-width="1" stroke-dasharray="3 4" />`;
     const label = isBacktest ? `${val.toFixed(1)}R` : formatMoney(val).replace(".00", "");
-    gridLines += `<text x="${padL - 8}" y="${y + 3}" text-anchor="end" font-size="10" fill="#8fa8b3" font-family="monospace">${label}</text>`;
+    gridLines += `<text x="${padL - 8}" y="${y + 3}" text-anchor="end" font-size="10" fill="#8b8d97" font-family="monospace">${label}</text>`;
   }
 
   svg.innerHTML = `
@@ -1588,7 +1744,7 @@ function buildDonutSVG(svgEl, segments) {
   svgEl.innerHTML = "";
   const total = segments.reduce((s, seg) => s + seg.value, 0);
   if (total <= 0) {
-    svgEl.innerHTML = `<circle cx="60" cy="60" r="44" fill="none" stroke="#123344" stroke-width="16" />`;
+    svgEl.innerHTML = `<circle cx="60" cy="60" r="44" fill="none" stroke="#26272e" stroke-width="16" />`;
     return;
   }
   const r = 44, cx = 60, cy = 60;
@@ -1661,8 +1817,8 @@ function renderWinLossDonut(trades) {
   }
 
   const segments = [
-    { label: "Win", value: wins, color: "#6fd68f" },
-    { label: "Loss", value: losses, color: "#f2545b" },
+    { label: "Win", value: wins, color: "#34d399" },
+    { label: "Loss", value: losses, color: "#f87171" },
     { label: "Breakeven", value: bes, color: "#ffb648" },
   ].filter(s => s.value > 0);
 
@@ -1671,11 +1827,11 @@ function renderWinLossDonut(trades) {
 
   legend.innerHTML = `
     <div class="donut-legend-item">
-      <div class="donut-legend-left"><span class="donut-dot" style="background:#6fd68f"></span><span class="donut-legend-label">Win</span></div>
+      <div class="donut-legend-left"><span class="donut-dot" style="background:#34d399"></span><span class="donut-legend-label">Win</span></div>
       <div class="donut-legend-value pos">${wins}</div>
     </div>
     <div class="donut-legend-item">
-      <div class="donut-legend-left"><span class="donut-dot" style="background:#f2545b"></span><span class="donut-legend-label">Loss</span></div>
+      <div class="donut-legend-left"><span class="donut-dot" style="background:#f87171"></span><span class="donut-legend-label">Loss</span></div>
       <div class="donut-legend-value neg">${losses}</div>
     </div>
     ${bes > 0 ? `
@@ -1699,16 +1855,16 @@ function buildBarChartSVG(svgEl, bars) {
   const halfH = (h - padT - padB) / 2;
 
   const barW = (w - padL - padR) / bars.length;
-  let content = `<line x1="${padL}" y1="${zeroY}" x2="${w - padR}" y2="${zeroY}" stroke="#123344" stroke-width="1" />`;
+  let content = `<line x1="${padL}" y1="${zeroY}" x2="${w - padR}" y2="${zeroY}" stroke="#26272e" stroke-width="1" />`;
 
   bars.forEach((bar, i) => {
     const x = padL + i * barW + barW * 0.2;
     const bw = barW * 0.6;
     const barH = Math.abs(bar.value) / maxAbs * halfH;
     const y = bar.value >= 0 ? zeroY - barH : zeroY;
-    const color = bar.value > 0 ? "#6fd68f" : bar.value < 0 ? "#f2545b" : "#1c4a5e";
+    const color = bar.value > 0 ? "#34d399" : bar.value < 0 ? "#f87171" : "#3a3b44";
     content += `<rect x="${x}" y="${y}" width="${bw}" height="${Math.max(barH, bar.value === 0 ? 2 : 0)}" fill="${color}" rx="2" />`;
-    content += `<text x="${x + bw / 2}" y="${h - 6}" text-anchor="middle" font-size="9.5" fill="#8fa8b3">${escapeHtml(bar.label)}</text>`;
+    content += `<text x="${x + bw / 2}" y="${h - 6}" text-anchor="middle" font-size="9.5" fill="#8b8d97">${escapeHtml(bar.label)}</text>`;
   });
 
   svgEl.innerHTML = content;
@@ -1756,7 +1912,7 @@ function renderResultBar(trades) {
 
   const entries = Object.entries(byResult);
   if (entries.length === 0) {
-    svg.innerHTML = `<text x="200" y="70" text-anchor="middle" fill="#8fa8b3" font-size="12">Belum ada data</text>`;
+    svg.innerHTML = `<text x="200" y="70" text-anchor="middle" fill="#8b8d97" font-size="12">Belum ada data</text>`;
     return;
   }
 
