@@ -15,6 +15,15 @@
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+<script>
+(function(){
+  try {
+    if (localStorage.getItem('jt_pnl_hidden') === '1') {
+      document.body.classList.add('pnl-hidden');
+    }
+  } catch (e) {}
+})();
+</script>
 
   <!-- ===================== AUTH SCREEN ===================== -->
   <div id="auth-shell" class="auth-shell">
@@ -81,113 +90,64 @@
         </svg>
         <span>JURNAL TRADING</span>
       </div>
-    </div>
 
-    <nav class="tabs">
-      <button class="tab-btn active" data-tab="dashboard">
-        <span class="tab-icon">
-          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 10.5L12 3l9 7.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 9.5V21h5v-6h4v6h5V9.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </span>
-        <span class="tab-label">Dashboard</span>
-      </button>
-      <button class="tab-btn" data-tab="tradelog">
-        <span class="tab-icon">
-          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="3" width="16" height="18" rx="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="8" y1="8" x2="16" y2="8" stroke-linecap="round"/><line x1="8" y1="12.5" x2="16" y2="12.5" stroke-linecap="round"/><line x1="8" y1="17" x2="13" y2="17" stroke-linecap="round"/></svg>
-        </span>
-        <span class="tab-label">Trade Log</span>
-      </button>
-      <button class="tab-btn" data-tab="analytics">
-        <span class="tab-icon">
-          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="12" width="3.5" height="8" rx="1"/><rect x="10.2" y="6" width="3.5" height="14" rx="1"/><rect x="16.5" y="9" width="3.5" height="11" rx="1"/></svg>
-        </span>
-        <span class="tab-label">Analytics</span>
-      </button>
-      <button class="tab-btn" data-tab="study">
-        <span class="tab-icon">
-          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6.5 12 3l9 3.5-9 3.5-9-3.5Z" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 9.5V16c0 1.2 2.2 3 5 3s5-1.8 5-3V9.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 7.5V14" stroke-linecap="round"/></svg>
-        </span>
-        <span class="tab-label">Study</span>
-      </button>
-    </nav>
+      <nav class="tabs">
+        <button class="tab-btn active" data-tab="dashboard">
+          <span class="tab-icon">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 10.5L12 3l9 7.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 9.5V21h5v-6h4v6h5V9.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span class="tab-label">Dashboard</span>
+        </button>
+        <button class="tab-btn" data-tab="tradelog">
+          <span class="tab-icon">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="3" width="16" height="18" rx="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="8" y1="8" x2="16" y2="8" stroke-linecap="round"/><line x1="8" y1="12.5" x2="16" y2="12.5" stroke-linecap="round"/><line x1="8" y1="17" x2="13" y2="17" stroke-linecap="round"/></svg>
+          </span>
+          <span class="tab-label">Trade Log</span>
+        </button>
+        <button class="tab-btn" data-tab="analytics">
+          <span class="tab-icon">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="12" width="3.5" height="8" rx="1"/><rect x="10.2" y="6" width="3.5" height="14" rx="1"/><rect x="16.5" y="9" width="3.5" height="11" rx="1"/></svg>
+          </span>
+          <span class="tab-label">Analytics</span>
+        </button>
+        <button class="tab-btn" data-tab="study">
+          <span class="tab-icon">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6.5 12 3l9 3.5-9 3.5-9-3.5Z" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 9.5V16c0 1.2 2.2 3 5 3s5-1.8 5-3V9.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 7.5V14" stroke-linecap="round"/></svg>
+          </span>
+          <span class="tab-label">Study</span>
+        </button>
+      </nav>
 
-    <!-- ===== Profile shortcut (kiri bawah) ===== -->
-    <button class="profile-fab" id="profile-fab-btn" title="Akun">👤</button>
-    <div class="profile-menu hidden" id="profile-menu">
-      <div class="profile-menu-email" id="user-email"></div>
-      <div class="field">
-        <label>Akun Aktif</label>
-        <select id="account-switcher"></select>
+      <!-- ===== Profile shortcut (kanan atas) ===== -->
+      <div class="topbar-account">
+        <button class="profile-fab" id="profile-fab-btn" title="Akun">👤</button>
+        <div class="profile-menu hidden" id="profile-menu">
+          <div class="profile-menu-email" id="user-email"></div>
+          <div class="field">
+            <label>Akun Aktif</label>
+            <select id="account-switcher"></select>
+          </div>
+          <button class="btn btn-ghost" id="logout-btn">Keluar</button>
+          <button class="btn btn-ghost hidden" id="admin-approval-btn" style="margin-top:8px;">🔐 Kelola User Baru</button>
+        </div>
       </div>
-      <button class="btn btn-ghost" id="logout-btn">Keluar</button>
-      <button class="btn btn-ghost hidden" id="admin-approval-btn" style="margin-top:8px;">🔐 Kelola User Baru</button>
     </div>
 
     <main>
 
       <!-- ============ DASHBOARD TAB ============ -->
       <section id="tab-dashboard" class="tab-content">
-        <div class="dash-row">
-          <div class="panel calendar-panel">
-            <div class="panel-header">
-              <div>
-                <h3>Monthly Performance</h3>
-                <span class="panel-sub" id="cal-subtitle">0 trade</span>
-              </div>
-              <div class="month-nav">
-                <button type="button" id="cal-prev">‹</button>
-                <button type="button" id="cal-month-label" class="cal-month-label-btn">-</button>
-                <button type="button" id="cal-next">›</button>
-              </div>
-            </div>
+        <div class="dash-hero">
+          <div class="dash-hero-label">Total P&L</div>
+          <div class="dash-hero-value pnl-value" id="dash-total-pnl">$0.00</div>
+          <div class="dash-hero-sub" id="dash-hero-sub">Belum ada trade.</div>
+        </div>
 
-            <div id="cal-month-picker" class="cal-month-picker hidden">
-              <div class="cal-picker-year-row">
-                <button type="button" id="cal-picker-year-prev">‹</button>
-                <span id="cal-picker-year-label">2026</span>
-                <button type="button" id="cal-picker-year-next">›</button>
-              </div>
-              <div class="cal-picker-month-grid" id="cal-picker-month-grid"></div>
-            </div>
-
-            <div class="news-toolbar">
-              <button type="button" class="btn-news-add" id="news-add-btn">📰 + Tambah News</button>
-              <select id="news-filter">
-                <option value="all">Semua News</option>
-                <option value="medium">Orange Folder ke atas</option>
-                <option value="high">Red Folder aja</option>
-                <option value="none">Sembunyikan News</option>
-              </select>
-            </div>
-
-            <div class="cal-filter-toolbar">
-              <input type="text" id="cal-filter-pair" placeholder="Filter pair..." />
-              <select id="cal-filter-dir">
-                <option value="">Semua posisi</option>
-                <option value="Buy">Buy</option>
-                <option value="Sell">Sell</option>
-              </select>
-              <select id="cal-filter-result">
-                <option value="">Semua hasil</option>
-                <option value="win">Profit aja</option>
-                <option value="loss">Loss aja</option>
-              </select>
-              <button type="button" id="cal-filter-reset" class="cal-filter-reset hidden">✕ Reset</button>
-            </div>
-
-            <div class="calendar-weekdays">
-              <span>Sen</span><span>Sel</span><span>Rab</span><span>Kam</span><span>Jum</span><span>Sab</span><span>Min</span>
-            </div>
-            <div class="calendar-grid" id="calendar-grid"></div>
-          </div>
-
-          <div class="panel recent-panel">
-            <div class="panel-header">
-              <div>
-                <h3>Recent Trades</h3>
-                <span class="panel-sub">Terbaru dari semua waktu</span>
-              </div>
-            </div>
-            <div id="recent-trades-list" class="recent-list"></div>
+        <div class="dash-perf-header">
+          <span class="dash-perf-title">Performance</span>
+          <div class="dash-perf-actions">
+            <button type="button" class="dash-link-btn" id="dash-goto-analytics-btn">Full analytics →</button>
+            <button type="button" class="pnl-toggle-btn" id="pnl-toggle-btn">🙈 Hide P&L</button>
           </div>
         </div>
 
@@ -203,12 +163,12 @@
           </div>
           <div class="stat-card">
             <div class="stat-label" id="dash-pnl-sub">P&L BULAN INI · -</div>
-            <div class="stat-value neu" id="dash-pnl">$0.00</div>
+            <div class="stat-value neu pnl-value" id="dash-pnl">$0.00</div>
             <div class="breakdown-line">
-              <span>Profit</span><span class="pos" id="dash-profit">$0.00</span>
+              <span>Profit</span><span class="pos pnl-value" id="dash-profit">$0.00</span>
             </div>
             <div class="breakdown-line">
-              <span>Loss</span><span class="neg" id="dash-loss">$0.00</span>
+              <span>Loss</span><span class="neg pnl-value" id="dash-loss">$0.00</span>
             </div>
           </div>
           <div class="stat-card">
@@ -218,9 +178,40 @@
           </div>
           <div class="stat-card">
             <div class="stat-label" id="dash-balance-sub">SALDO AKUN</div>
-            <div class="stat-value neu" id="dash-balance">$0.00</div>
-            <div class="stat-footnote" id="dash-balance-footnote">Modal awal: $0.00</div>
+            <div class="stat-value neu pnl-value" id="dash-balance">$0.00</div>
+            <div class="stat-footnote pnl-value" id="dash-balance-footnote">Modal awal: $0.00</div>
           </div>
+        </div>
+
+        <div class="dash-chart-row">
+          <div class="panel cumulative-panel">
+            <div class="curve-panel-header">
+              <div>
+                <h3>Cumulative P&L</h3>
+                <span class="panel-sub">All time</span>
+              </div>
+              <div class="growth-change pnl-value" id="dash-growth-change">-</div>
+            </div>
+            <svg id="dash-growth-svg" width="100%" height="140" viewBox="0 0 1000 140" preserveAspectRatio="none"></svg>
+          </div>
+
+          <div class="panel thisweek-panel">
+            <h3>This Week</h3>
+            <span class="panel-sub" id="dash-week-range">-</span>
+            <div class="dash-week-value pnl-value" id="dash-week-pnl">$0.00</div>
+            <div class="dash-week-row"><span>Trades</span><span id="dash-week-trades">0</span></div>
+            <div class="dash-week-row"><span>Win rate</span><span id="dash-week-winrate">0%</span></div>
+          </div>
+        </div>
+
+        <div class="panel recent-panel">
+          <div class="panel-header">
+            <div>
+              <h3>Recent Trades</h3>
+              <span class="panel-sub">Terbaru dari semua waktu</span>
+            </div>
+          </div>
+          <div id="recent-trades-list" class="recent-list"></div>
         </div>
       </section>
 
@@ -235,7 +226,7 @@
         <div class="stats-row" id="tradelog-stats-row">
           <div class="stat-card">
             <div class="stat-label" id="tl-total-pnl-label">TOTAL P&L</div>
-            <div class="stat-value neu" id="tl-total-pnl">$0.00</div>
+            <div class="stat-value neu pnl-value" id="tl-total-pnl">$0.00</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">WIN RATE</div>
@@ -247,9 +238,12 @@
           </div>
           <div class="stat-card">
             <div class="stat-label" id="tl-balance-label">BALANCE</div>
-            <div class="stat-value neu" id="tl-balance">$0.00</div>
+            <div class="stat-value neu pnl-value" id="tl-balance">$0.00</div>
           </div>
         </div>
+
+        <div class="tradelog-layout">
+        <div class="tradelog-main">
 
         <!-- ===== INLINE TRADE FORM ===== -->
         <div class="trade-form-panel hidden" id="trade-form-panel">
@@ -446,6 +440,64 @@
             <div class="big">📓</div>
             <div>Belum ada trade di akun ini. Klik "+ New Trade" untuk mulai mencatat.</div>
           </div>
+        </div>
+
+        </div>
+
+        <aside class="tradelog-sidebar">
+          <div class="panel calendar-panel">
+            <div class="panel-header">
+              <div>
+                <h3>Monthly Performance</h3>
+                <span class="panel-sub" id="cal-subtitle">0 trade</span>
+              </div>
+              <div class="month-nav">
+                <button type="button" id="cal-prev">‹</button>
+                <button type="button" id="cal-month-label" class="cal-month-label-btn">-</button>
+                <button type="button" id="cal-next">›</button>
+              </div>
+            </div>
+
+            <div id="cal-month-picker" class="cal-month-picker hidden">
+              <div class="cal-picker-year-row">
+                <button type="button" id="cal-picker-year-prev">‹</button>
+                <span id="cal-picker-year-label">2026</span>
+                <button type="button" id="cal-picker-year-next">›</button>
+              </div>
+              <div class="cal-picker-month-grid" id="cal-picker-month-grid"></div>
+            </div>
+
+            <div class="news-toolbar">
+              <button type="button" class="btn-news-add" id="news-add-btn">📰 + Tambah News</button>
+              <select id="news-filter">
+                <option value="all">Semua News</option>
+                <option value="medium">Orange Folder ke atas</option>
+                <option value="high">Red Folder aja</option>
+                <option value="none">Sembunyikan News</option>
+              </select>
+            </div>
+
+            <div class="cal-filter-toolbar">
+              <input type="text" id="cal-filter-pair" placeholder="Filter pair..." />
+              <select id="cal-filter-dir">
+                <option value="">Semua posisi</option>
+                <option value="Buy">Buy</option>
+                <option value="Sell">Sell</option>
+              </select>
+              <select id="cal-filter-result">
+                <option value="">Semua hasil</option>
+                <option value="win">Profit aja</option>
+                <option value="loss">Loss aja</option>
+              </select>
+              <button type="button" id="cal-filter-reset" class="cal-filter-reset hidden">✕ Reset</button>
+            </div>
+
+            <div class="calendar-weekdays">
+              <span>Sen</span><span>Sel</span><span>Rab</span><span>Kam</span><span>Jum</span><span>Sab</span><span>Min</span>
+            </div>
+            <div class="calendar-grid" id="calendar-grid"></div>
+          </div>
+        </aside>
         </div>
       </section>
 
