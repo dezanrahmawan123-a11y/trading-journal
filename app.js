@@ -12,7 +12,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   getFirestore, collection, addDoc, updateDoc, deleteDoc,
-  doc, setDoc, onSnapshot, query, orderBy, serverTimestamp
+  doc, setDoc, onSnapshot, query, orderBy, serverTimestamp, deleteField
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const app = initializeApp(firebaseConfig);
@@ -122,7 +122,14 @@ const calMonthLabel = document.getElementById("cal-month-label");
 const calendarGrid = document.getElementById("calendar-grid");
 const calPrevBtn = document.getElementById("cal-prev");
 const calNextBtn = document.getElementById("cal-next");
-const recentTradesList = document.getElementById("recent-trades-list");
+const goalModalOverlay = document.getElementById("goal-modal-overlay");
+const goalModalTitle = document.getElementById("goal-modal-title");
+const goalModalError = document.getElementById("goal-modal-error");
+const goalForm = document.getElementById("goal-form");
+const goalTargetInput = document.getElementById("goal-target-input");
+const goalCancelBtn = document.getElementById("goal-cancel-btn");
+const goalClearBtn = document.getElementById("goal-clear-btn");
+let goalEditingPeriod = null;
 
 // ============================================================
 // AUTH
@@ -2257,7 +2264,7 @@ function renderDashboard(accountTrades) {
   calSubtitle.textContent = `${monthTradesForCalendar.length} trade · ${MONTH_NAMES_ID[month]} ${year}`;
 
   renderCalendarGrid(year, month, monthTradesForCalendar, monthNews);
-  renderRecentTrades(accountTrades);
+  renderGoals(accountTrades);
   renderDashboardStats(monthTrades, accountTrades);
   renderDashboardHero(accountTrades);
 }
@@ -2565,35 +2572,98 @@ dayDetailOverlay.addEventListener("click", (e) => {
   if (e.target === dayDetailOverlay) closeDayDetail();
 });
 
-function renderRecentTrades(accountTrades) {
-  const recent = [...accountTrades].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 6);
-  const isBacktest = getCurrentAccount()?.type === "backtest";
+const GOAL_PERIODS = ["day", "week", "month"];
+const GOAL_PERIOD_TITLE = { day: "Hari Ini", week: "Minggu Ini", month: "Bulan Ini" };
 
-  if (recent.length === 0) {
-    recentTradesList.innerHTML = `<div class="recent-empty">Belum ada trade.</div>`;
+function renderGoals(accountTrades) {
+  const account = getCurrentAccount();
+  const isBacktest = account?.type === "backtest";
+  const goals = account?.goals || {};
+
+  GOAL_PERIODS.forEach(period => {
+    const body = document.getElementById(`goal-body-${period}`);
+    if (!body) return;
+    const target = goals[period];
+    const actual = filterTradesByPeriod(accountTrades, period).reduce((s, t) => s + (t.pnl || 0), 0);
+
+    if (target === undefined || target === null || target === "") {
+      body.innerHTML = `<button type="button" class="goal-set-cta" data-period="${period}">Set a target</button>`;
+      body.querySelector(".goal-set-cta").addEventListener("click", () => openGoalModal(period));
+      return;
+    }
+
+    const pct = target > 0
+      ? Math.min(100, Math.max(0, (actual / target) * 100))
+      : (actual >= target ? 100 : 0);
+
+    body.innerHTML = `
+      <div class="goal-progress-value pnl-value">${formatPnl(actual, isBacktest)} <span class="goal-target-amt">/ ${formatPnl(target, isBacktest)}</span></div>
+      <div class="goal-progress-track"><div class="goal-progress-bar" style="width:${pct}%"></div></div>
+      <div class="goal-progress-pct">${Math.round(pct)}%</div>
+    `;
+  });
+}
+
+function openGoalModal(period) {
+  goalEditingPeriod = period;
+  goalModalError.classList.add("hidden");
+  const account = getCurrentAccount();
+  const existing = account?.goals?.[period];
+  goalTargetInput.value = (existing !== undefined && existing !== null) ? existing : "";
+  goalModalTitle.textContent = `Set Target — ${GOAL_PERIOD_TITLE[period] || ""}`;
+  goalClearBtn.classList.toggle("hidden", existing === undefined || existing === null);
+  goalModalOverlay.classList.remove("hidden");
+  goalTargetInput.focus();
+}
+
+function closeGoalModal() {
+  goalModalOverlay.classList.add("hidden");
+  goalEditingPeriod = null;
+}
+
+document.querySelectorAll(".goal-edit-btn").forEach(btn => {
+  btn.addEventListener("click", () => openGoalModal(btn.dataset.period));
+});
+
+goalCancelBtn.addEventListener("click", closeGoalModal);
+goalModalOverlay.addEventListener("click", (e) => { if (e.target === goalModalOverlay) closeGoalModal(); });
+
+goalForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  goalModalError.classList.add("hidden");
+
+  const val = parseFloat(goalTargetInput.value);
+  if (isNaN(val) || val === 0) {
+    goalModalError.textContent = "Isi target angkanya (gak boleh 0).";
+    goalModalError.classList.remove("hidden");
     return;
   }
 
-  recentTradesList.innerHTML = recent.map(t => {
-    const pnlClass = t.pnl > 0 ? "pos" : (t.pnl < 0 ? "neg" : "neu");
-    return `
-      <div class="recent-item recent-item-clickable" data-id="${t.id}">
-        <div class="recent-item-left">
-          <span class="recent-item-pair">${escapeHtml(t.pair || "-")}</span>
-          <span class="recent-item-date">${t.date || "-"} · ${escapeHtml(t.position || "-")}</span>
-        </div>
-        <span class="recent-item-pnl pnl-value ${pnlClass}">${formatNum(t.pnl)}${isBacktest ? "R" : ""}</span>
-      </div>
-    `;
-  }).join("");
-
-  recentTradesList.querySelectorAll(".recent-item-clickable").forEach(item => {
-    item.addEventListener("click", () => {
-      const trade = allTrades.find(t => t.id === item.dataset.id);
-      if (trade) openTradeDetail(trade);
+  try {
+    await updateDoc(doc(db, "users", currentUser.uid, "accounts", currentAccountId), {
+      [`goals.${goalEditingPeriod}`]: val,
     });
-  });
-}
+    closeGoalModal();
+  } catch (err) {
+    goalModalError.textContent = "Gagal menyimpan. Coba lagi.";
+    goalModalError.classList.remove("hidden");
+    console.error(err);
+  }
+});
+
+goalClearBtn.addEventListener("click", async () => {
+  if (!goalEditingPeriod) return;
+  try {
+    await updateDoc(doc(db, "users", currentUser.uid, "accounts", currentAccountId), {
+      [`goals.${goalEditingPeriod}`]: deleteField(),
+    });
+    closeGoalModal();
+  } catch (err) {
+    goalModalError.textContent = "Gagal menghapus. Coba lagi.";
+    goalModalError.classList.remove("hidden");
+    console.error(err);
+  }
+});
 
 function renderDashboardStats(monthTrades, accountTrades) {
   const account = getCurrentAccount();

@@ -211,14 +211,35 @@
           </div>
         </div>
 
-        <div class="panel recent-panel">
+        <div class="panel goals-panel">
           <div class="panel-header">
             <div>
-              <h3>Recent Trades</h3>
-              <span class="panel-sub">Terbaru dari semua waktu</span>
+              <h3>Goals</h3>
             </div>
           </div>
-          <div id="recent-trades-list" class="recent-list"></div>
+          <div class="goals-row">
+            <div class="goal-col">
+              <div class="goal-col-head">
+                <span class="goal-col-label">Today</span>
+                <button type="button" class="goal-edit-btn" data-period="day" title="Set target">✎</button>
+              </div>
+              <div class="goal-col-body" id="goal-body-day"></div>
+            </div>
+            <div class="goal-col">
+              <div class="goal-col-head">
+                <span class="goal-col-label">This Week</span>
+                <button type="button" class="goal-edit-btn" data-period="week" title="Set target">✎</button>
+              </div>
+              <div class="goal-col-body" id="goal-body-week"></div>
+            </div>
+            <div class="goal-col">
+              <div class="goal-col-head">
+                <span class="goal-col-label">This Month</span>
+                <button type="button" class="goal-edit-btn" data-period="month" title="Set target">✎</button>
+              </div>
+              <div class="goal-col-body" id="goal-body-month"></div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -720,6 +741,25 @@
           <button type="button" class="btn btn-ghost hidden" id="study-delete-btn">Hapus</button>
           <button type="button" class="btn btn-ghost" id="study-cancel-btn">Batal</button>
           <button type="submit" class="btn btn-primary" id="study-save-btn">Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================== MODAL GOALS: SET TARGET ===================== -->
+  <div id="goal-modal-overlay" class="modal-overlay hidden">
+    <div class="modal modal-sm">
+      <h2 id="goal-modal-title">Set Target</h2>
+      <div id="goal-modal-error" class="error-msg hidden"></div>
+      <form id="goal-form">
+        <div class="field full">
+          <label>Target P&amp;L *</label>
+          <input type="number" step="any" id="goal-target-input" placeholder="Contoh: 200" />
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost hidden" id="goal-clear-btn">Hapus Target</button>
+          <button type="button" class="btn btn-ghost" id="goal-cancel-btn">Batal</button>
+          <button type="submit" class="btn btn-primary">Simpan</button>
         </div>
       </form>
     </div>
