@@ -188,9 +188,16 @@
             <div class="curve-panel-header">
               <div>
                 <h3>Cumulative P&L</h3>
-                <span class="panel-sub">All time</span>
+                <span class="panel-sub" id="dash-growth-period-label">All time</span>
               </div>
               <div class="growth-change pnl-value" id="dash-growth-change">-</div>
+            </div>
+            <div class="chart-period-toggle" id="dash-growth-period-toggle">
+              <button type="button" data-period="day">Day</button>
+              <button type="button" data-period="week">Week</button>
+              <button type="button" data-period="month">Month</button>
+              <button type="button" data-period="year">Year</button>
+              <button type="button" data-period="all" class="active">All</button>
             </div>
             <svg id="dash-growth-svg" width="100%" height="140" viewBox="0 0 1000 140" preserveAspectRatio="none"></svg>
           </div>
@@ -699,10 +706,26 @@
           <label>Judul *</label>
           <input type="text" id="study-title" required placeholder="Contoh: Dasar Risk Management" />
         </div>
-        <div class="field">
-          <label id="study-url-label">Link / URL *</label>
-          <input type="text" id="study-url" required placeholder="https://..." />
+
+        <!-- Mode LINK: isi URL manual -->
+        <div class="field hidden" id="study-url-field">
+          <label>Link / URL *</label>
+          <input type="text" id="study-url" placeholder="https://..." />
         </div>
+
+        <!-- Mode PDF/VIDEO: upload file langsung -->
+        <div class="field full hidden" id="study-file-field">
+          <label id="study-file-label">File *</label>
+          <input type="file" id="study-file-input" class="hidden" />
+          <button type="button" class="btn-upload" id="study-file-trigger">📤 Pilih File</button>
+          <div id="study-file-current" class="study-file-current hidden"></div>
+          <div id="study-file-progress" class="study-file-progress hidden">
+            <div class="study-file-progress-bar" id="study-file-progress-bar"></div>
+            <span id="study-file-progress-label">Mengupload... 0%</span>
+          </div>
+          <p class="study-file-hint" id="study-file-hint">Maks. 20MB buat PDF.</p>
+        </div>
+
         <div class="field full">
           <label>Deskripsi (opsional)</label>
           <textarea id="study-description" rows="2" placeholder="Ringkasan singkat materinya..."></textarea>

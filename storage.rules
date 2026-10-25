@@ -1,0 +1,11 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // File materi Study (PDF/Video) - semua user yang login boleh baca,
+    // tapi cuma admin yang boleh upload/ganti/hapus.
+    match /study_materials/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == "igxAKYsyzqMZOUs3xTl8J42ya333";
+    }
+  }
+}

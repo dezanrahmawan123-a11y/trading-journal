@@ -14,10 +14,14 @@ import {
   getFirestore, collection, addDoc, updateDoc, deleteDoc,
   doc, setDoc, onSnapshot, query, orderBy, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const storage = getStorage(app);
 
 // ============================================================
 // GANTI INI dengan User UID akun lo sendiri (lihat panduan di chat).
@@ -351,15 +355,46 @@ function translateFirebaseError(code) {
 // TABS
 // ============================================================
 
+function switchTab(tab) {
+  tabButtons.forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  Object.entries(tabContents).forEach(([key, el]) => {
+    if (el) el.classList.toggle("hidden", key !== tab);
+  });
+}
+
 tabButtons.forEach(btn => {
+  btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+});
+
+const dashGotoAnalyticsBtn = document.getElementById("dash-goto-analytics-btn");
+if (dashGotoAnalyticsBtn) dashGotoAnalyticsBtn.addEventListener("click", () => switchTab("analytics"));
+
+// ============================================================
+// HIDE / BLUR P&L
+// ============================================================
+
+const PNL_HIDDEN_KEY = "jt_pnl_hidden";
+
+function isPnlHidden() {
+  try { return localStorage.getItem(PNL_HIDDEN_KEY) === "1"; } catch { return false; }
+}
+
+function applyPnlHiddenState() {
+  const hidden = isPnlHidden();
+  document.body.classList.toggle("pnl-hidden", hidden);
+  document.querySelectorAll(".pnl-toggle-btn").forEach(b => {
+    b.textContent = hidden ? "👁 Show P&L" : "🙈 Hide P&L";
+  });
+}
+
+document.querySelectorAll(".pnl-toggle-btn").forEach(btn => {
   btn.addEventListener("click", () => {
-    const tab = btn.dataset.tab;
-    tabButtons.forEach(b => b.classList.toggle("active", b === btn));
-    Object.entries(tabContents).forEach(([key, el]) => {
-      el.classList.toggle("hidden", key !== tab);
-    });
+    try { localStorage.setItem(PNL_HIDDEN_KEY, isPnlHidden() ? "0" : "1"); } catch {}
+    applyPnlHiddenState();
   });
 });
+
+applyPnlHiddenState();
 
 // ============================================================
 // FIRESTORE: ACCOUNTS
@@ -640,30 +675,94 @@ const studyModalOverlay = document.getElementById("study-modal-overlay");
 const studyModalTitle = document.getElementById("study-modal-title");
 const studyModalError = document.getElementById("study-modal-error");
 const studyForm = document.getElementById("study-form");
-const studyUrlLabel = document.getElementById("study-url-label");
 const studyCancelBtn = document.getElementById("study-cancel-btn");
 const studyDeleteBtn = document.getElementById("study-delete-btn");
+const studyUrlField = document.getElementById("study-url-field");
+const studyFileField = document.getElementById("study-file-field");
+const studyFileLabel = document.getElementById("study-file-label");
+const studyFileHint = document.getElementById("study-file-hint");
+const studyFileInput = document.getElementById("study-file-input");
+const studyFileTrigger = document.getElementById("study-file-trigger");
+const studyFileCurrent = document.getElementById("study-file-current");
+const studyFileProgress = document.getElementById("study-file-progress");
+const studyFileProgressBar = document.getElementById("study-file-progress-bar");
+const studyFileProgressLabel = document.getElementById("study-file-progress-label");
+const studySaveBtn = document.getElementById("study-save-btn");
 
 const STUDY_TYPE_LABEL = { pdf: "📄 PDF", video: "🎥 Video", link: "🔗 Link" };
+const STUDY_MAX_MB = { pdf: 20, video: 150 };
+let studyPendingFile = null;
+let studyExisting = null; // item lagi di-edit (buat tau url/storagePath lama)
 
-function getYouTubeId(url) {
-  if (!url) return null;
-  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-  return m ? m[1] : null;
+function getStudyType() {
+  const typePill = document.querySelector("#study-type-group .pill.active");
+  return typePill ? typePill.dataset.value : "pdf";
 }
+
+function refreshStudyFieldMode() {
+  const type = getStudyType();
+  studyPendingFile = null;
+  studyFileInput.value = "";
+  studyFileProgress.classList.add("hidden");
+
+  if (type === "link") {
+    studyUrlField.classList.remove("hidden");
+    studyFileField.classList.add("hidden");
+    document.getElementById("study-url").required = true;
+  } else {
+    studyUrlField.classList.add("hidden");
+    studyFileField.classList.remove("hidden");
+    document.getElementById("study-url").required = false;
+    studyFileLabel.textContent = type === "pdf" ? "File PDF *" : "File Video *";
+    studyFileTrigger.textContent = type === "pdf" ? "📤 Pilih File PDF" : "📤 Pilih File Video";
+    studyFileInput.accept = type === "pdf" ? "application/pdf" : "video/*";
+    studyFileHint.textContent = `Maks. ${STUDY_MAX_MB[type]}MB buat ${type === "pdf" ? "PDF" : "video"}.`;
+
+    if (studyExisting && studyExisting.type === type && studyExisting.fileName) {
+      studyFileCurrent.innerHTML = `File sekarang: <b>${escapeHtml(studyExisting.fileName)}</b> — pilih file baru buat ganti.`;
+      studyFileCurrent.classList.remove("hidden");
+    } else {
+      studyFileCurrent.classList.add("hidden");
+    }
+  }
+}
+
+document.querySelectorAll("#study-type-group .pill").forEach(p => p.addEventListener("click", refreshStudyFieldMode));
+
+studyFileTrigger.addEventListener("click", () => studyFileInput.click());
+studyFileInput.addEventListener("change", () => {
+  const file = studyFileInput.files[0];
+  if (!file) { studyPendingFile = null; return; }
+  const type = getStudyType();
+  const maxBytes = (STUDY_MAX_MB[type] || 20) * 1024 * 1024;
+  if (file.size > maxBytes) {
+    studyModalError.textContent = `File kegedean. Maks ${STUDY_MAX_MB[type]}MB.`;
+    studyModalError.classList.remove("hidden");
+    studyFileInput.value = "";
+    studyPendingFile = null;
+    return;
+  }
+  studyModalError.classList.add("hidden");
+  studyPendingFile = file;
+  studyFileCurrent.innerHTML = `File dipilih: <b>${escapeHtml(file.name)}</b> (${(file.size / 1024 / 1024).toFixed(1)}MB)`;
+  studyFileCurrent.classList.remove("hidden");
+});
 
 function openStudyModal(item = null) {
   studyForm.reset();
   studyModalError.classList.add("hidden");
+  studyExisting = item;
+  studyPendingFile = null;
   document.getElementById("study-id").value = item?.id || "";
   document.getElementById("study-title").value = item?.title || "";
-  document.getElementById("study-url").value = item?.url || "";
+  document.getElementById("study-url").value = item?.type === "link" ? (item?.url || "") : "";
   document.getElementById("study-description").value = item?.description || "";
   document.querySelectorAll("#study-type-group .pill").forEach(p => p.classList.remove("active"));
   const typePill = document.querySelector(`#study-type-group .pill[data-value="${item?.type || "pdf"}"]`);
   if (typePill) typePill.classList.add("active");
   studyModalTitle.textContent = item ? "Edit Materi" : "Tambah Materi";
   studyDeleteBtn.classList.toggle("hidden", !item);
+  refreshStudyFieldMode();
   studyModalOverlay.classList.remove("hidden");
 }
 
@@ -675,36 +774,114 @@ studyAddBtn.addEventListener("click", () => openStudyModal());
 studyCancelBtn.addEventListener("click", closeStudyModal);
 studyModalOverlay.addEventListener("click", (e) => { if (e.target === studyModalOverlay) closeStudyModal(); });
 
+function uploadStudyFile(file, type) {
+  return new Promise((resolve, reject) => {
+    const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+    const path = `study_materials/${Date.now()}_${safeName}`;
+    const storageRef = ref(storage, path);
+    const task = uploadBytesResumable(storageRef, file);
+
+    studyFileProgress.classList.remove("hidden");
+    task.on(
+      "state_changed",
+      (snap) => {
+        const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
+        studyFileProgressBar.style.width = pct + "%";
+        studyFileProgressLabel.textContent = `Mengupload... ${pct}%`;
+      },
+      (err) => reject(err),
+      async () => {
+        const url = await getDownloadURL(task.snapshot.ref);
+        resolve({ url, storagePath: path, fileName: file.name });
+      }
+    );
+  });
+}
+
 studyForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   studyModalError.classList.add("hidden");
 
   const studyId = document.getElementById("study-id").value || null;
   const title = document.getElementById("study-title").value.trim();
-  const url = document.getElementById("study-url").value.trim();
   const description = document.getElementById("study-description").value.trim();
-  const typePill = document.querySelector("#study-type-group .pill.active");
-  const type = typePill ? typePill.dataset.value : "pdf";
+  const type = getStudyType();
 
-  if (!title || !url) {
-    studyModalError.textContent = "Isi judul dan link/URL materinya.";
+  if (!title) {
+    studyModalError.textContent = "Isi judul materinya.";
     studyModalError.classList.remove("hidden");
     return;
   }
 
+  let data = { title, description, type };
+
+  if (type === "link") {
+    const url = document.getElementById("study-url").value.trim();
+    if (!url) {
+      studyModalError.textContent = "Isi link/URL materinya.";
+      studyModalError.classList.remove("hidden");
+      return;
+    }
+    data.url = url;
+    data.fileName = null;
+    data.storagePath = null;
+  } else {
+    if (!studyPendingFile && !(studyExisting && studyExisting.type === type && studyExisting.url)) {
+      studyModalError.textContent = `Pilih file ${type === "pdf" ? "PDF" : "video"}-nya dulu.`;
+      studyModalError.classList.remove("hidden");
+      return;
+    }
+
+    if (studyPendingFile) {
+      studySaveBtn.disabled = true;
+      studySaveBtn.textContent = "Mengupload...";
+      try {
+        const uploaded = await uploadStudyFile(studyPendingFile, type);
+        data.url = uploaded.url;
+        data.storagePath = uploaded.storagePath;
+        data.fileName = uploaded.fileName;
+
+        // Hapus file lama di Storage kalau ini edit & gantiin file
+        if (studyExisting?.storagePath && studyExisting.storagePath !== uploaded.storagePath) {
+          deleteObject(ref(storage, studyExisting.storagePath)).catch(() => {});
+        }
+      } catch (err) {
+        studySaveBtn.disabled = false;
+        studySaveBtn.textContent = "Simpan";
+        studyFileProgress.classList.add("hidden");
+        studyModalError.textContent = "Gagal upload file. Coba lagi.";
+        studyModalError.classList.remove("hidden");
+        console.error(err);
+        return;
+      }
+    } else {
+      // edit tanpa ganti file - pertahanin file lama
+      data.url = studyExisting.url;
+      data.storagePath = studyExisting.storagePath || null;
+      data.fileName = studyExisting.fileName || null;
+    }
+  }
+
   try {
-    await saveStudy({ title, url, description, type }, studyId);
+    await saveStudy(data, studyId);
     closeStudyModal();
   } catch (err) {
     studyModalError.textContent = "Gagal menyimpan. Coba lagi.";
     studyModalError.classList.remove("hidden");
     console.error(err);
+  } finally {
+    studySaveBtn.disabled = false;
+    studySaveBtn.textContent = "Simpan";
+    studyFileProgress.classList.add("hidden");
   }
 });
 
 studyDeleteBtn.addEventListener("click", async () => {
   const studyId = document.getElementById("study-id").value;
   if (studyId && confirm("Hapus materi ini?")) {
+    if (studyExisting?.storagePath) {
+      deleteObject(ref(storage, studyExisting.storagePath)).catch(() => {});
+    }
     await removeStudy(studyId);
     closeStudyModal();
   }
@@ -718,7 +895,7 @@ function renderStudy() {
     const card = document.createElement("div");
     card.className = "study-card";
 
-    const ytId = item.type === "video" ? getYouTubeId(item.url) : null;
+    const openLabel = item.type === "pdf" ? "Buka PDF" : item.type === "video" ? "Buka Video" : "Buka Link";
 
     card.innerHTML = `
       <div class="study-card-top">
@@ -732,14 +909,17 @@ function renderStudy() {
       </div>
       <h4>${escapeHtml(item.title || "")}</h4>
       ${item.description ? `<p>${escapeHtml(item.description)}</p>` : ""}
-      ${ytId ? `<div class="study-card-embed"><iframe src="https://www.youtube.com/embed/${ytId}" title="${escapeHtml(item.title || "")}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>` : ""}
-      ${!ytId ? `<a class="study-card-open" href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener noreferrer">Buka ${item.type === "pdf" ? "PDF" : item.type === "video" ? "Video" : "Link"} ↗</a>` : `<a class="study-card-open" href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener noreferrer">Buka di YouTube ↗</a>`}
+      ${item.type === "video" ? `<video class="study-card-video" src="${escapeHtml(item.url || "")}" controls preload="metadata"></video>` : ""}
+      <a class="study-card-open" href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener noreferrer">${openLabel} ↗</a>
     `;
 
     if (isAdminUser) {
       card.querySelector(".study-edit-btn").addEventListener("click", () => openStudyModal(item));
       card.querySelector(".study-del-btn").addEventListener("click", async () => {
-        if (confirm("Hapus materi ini?")) await removeStudy(item.id);
+        if (confirm("Hapus materi ini?")) {
+          if (item.storagePath) deleteObject(ref(storage, item.storagePath)).catch(() => {});
+          await removeStudy(item.id);
+        }
       });
     }
 
@@ -1316,7 +1496,7 @@ function openTradeDetail(trade) {
       </div>
       <div class="detail-pnl-block">
         <div class="detail-pnl-label">${isBacktest ? "Hasil (R)" : "Net P/L"}</div>
-        <div class="detail-pnl-value ${pnlClass}">${formatPnl(trade.pnl, isBacktest)}</div>
+        <div class="detail-pnl-value pnl-value ${pnlClass}">${formatPnl(trade.pnl, isBacktest)}</div>
       </div>
     </div>
 
@@ -1543,7 +1723,7 @@ function renderTradeLogStats(accountTrades) {
 
   const pnlEl = document.getElementById("tl-total-pnl");
   pnlEl.textContent = formatPnl(totalPnl, isBacktest);
-  pnlEl.className = "stat-value " + (totalPnl > 0 ? "pos" : totalPnl < 0 ? "neg" : "neu");
+  pnlEl.className = "stat-value pnl-value " + (totalPnl > 0 ? "pos" : totalPnl < 0 ? "neg" : "neu");
   document.getElementById("tl-total-pnl-label").textContent = isBacktest ? "TOTAL R" : "TOTAL P&L";
 
   document.getElementById("tl-winrate").textContent = winRate.toFixed(0) + "%";
@@ -1581,7 +1761,7 @@ function renderTable(trades) {
       <td><span class="dir-badge ${dirClass}">${t.position || "-"}</span></td>
       <td>${escapeHtml(htfText)}</td>
       <td class="mono">${escapeHtml(t.riskReward || "-")}</td>
-      <td class="mono ${pnlClass}">${formatNum(t.pnl)}${isBacktest ? "R" : ""}</td>
+      <td class="mono ${pnlClass} pnl-value">${formatNum(t.pnl)}${isBacktest ? "R" : ""}</td>
       <td><span class="result-badge ${resultClass}">${escapeHtml(t.result || "-")}</span></td>
       <td>${escapeHtml(confluenceText)}</td>
       <td>
@@ -1647,12 +1827,12 @@ function renderAnalytics(trades) {
 
   const pnlEl = document.getElementById("stat-pnl");
   pnlEl.textContent = formatNum(totalPnl) + unit;
-  pnlEl.className = "stat-value " + (totalPnl > 0 ? "pos" : totalPnl < 0 ? "neg" : "neu");
+  pnlEl.className = "stat-value pnl-value " + (totalPnl > 0 ? "pos" : totalPnl < 0 ? "neg" : "neu");
 
   document.getElementById("stat-avgwin").textContent = formatNum(avgWin) + unit;
   document.getElementById("stat-avgloss").textContent = formatNum(avgLoss) + unit;
 
-  renderGrowthChart(trades);
+  renderGrowthChart(trades, { titleId: "growth-title", subtitleId: "growth-subtitle" });
   renderSymbolDonut(trades);
   renderWinLossDonut(trades);
   renderWeekdayBar(trades);
@@ -1662,25 +1842,33 @@ function renderAnalytics(trades) {
 
 const CHART_PALETTE = ["#7c6cff", "#34d399", "#ffb648", "#f87171", "#4cc9f0", "#f72585", "#80ed99", "#e0aaff"];
 
-function renderGrowthChart(trades) {
-  const svg = document.getElementById("growth-svg");
-  const changeEl = document.getElementById("growth-change");
-  const startLabel = document.getElementById("growth-start-label");
-  const endLabel = document.getElementById("growth-end-label");
+function renderGrowthChart(trades, opts = {}) {
+  const svg = document.getElementById(opts.svgId || "growth-svg");
+  const changeEl = document.getElementById(opts.changeId || "growth-change");
+  const startLabel = opts.startLabelId ? document.getElementById(opts.startLabelId) : document.getElementById("growth-start-label");
+  const endLabel = opts.endLabelId ? document.getElementById(opts.endLabelId) : document.getElementById("growth-end-label");
+  if (!svg || !changeEl) return;
   svg.innerHTML = "";
 
   const account = getCurrentAccount();
   const isBacktest = account?.type === "backtest";
-  const startingBalance = account?.startingBalance || 0;
-  document.getElementById("growth-title").textContent = isBacktest ? "R GROWTH VIEW" : "TRADE GROWTH VIEW";
-  document.getElementById("growth-subtitle").textContent = isBacktest ? "Cumulative R over time" : "Equity curve over time";
+  const startingBalance = opts.startingBalanceOverride !== undefined ? opts.startingBalanceOverride : (account?.startingBalance || 0);
+
+  if (opts.titleId) {
+    const titleEl = document.getElementById(opts.titleId);
+    if (titleEl) titleEl.textContent = isBacktest ? "R GROWTH VIEW" : "TRADE GROWTH VIEW";
+  }
+  if (opts.subtitleId) {
+    const subtitleEl = document.getElementById(opts.subtitleId);
+    if (subtitleEl) subtitleEl.textContent = isBacktest ? "Cumulative R over time" : "Equity curve over time";
+  }
 
   if (trades.length === 0) {
     changeEl.textContent = "-";
-    changeEl.className = "growth-change neu";
-    startLabel.textContent = "-";
-    endLabel.textContent = "-";
-    svg.innerHTML = `<text x="500" y="90" text-anchor="middle" fill="#8b8d97" font-size="13">Belum ada data trade</text>`;
+    changeEl.className = "growth-change pnl-value neu";
+    if (startLabel) startLabel.textContent = "-";
+    if (endLabel) endLabel.textContent = "-";
+    svg.innerHTML = `<text x="500" y="90" text-anchor="middle" fill="#8a8a8e" font-size="13">Belum ada data trade</text>`;
     return;
   }
 
@@ -1688,7 +1876,7 @@ function renderGrowthChart(trades) {
   let cum = startingBalance;
   const points = [cum, ...chrono.map(t => (cum += t.pnl))];
 
-  const w = 1000, h = 180, padL = 60, padR = 10, padT = 14, padB = 10;
+  const w = 1000, h = opts.height || 180, padL = 60, padR = 10, padT = 14, padB = 10;
   const min = Math.min(...points);
   const max = Math.max(...points);
   const range = (max - min) || 1;
@@ -1705,16 +1893,15 @@ function renderGrowthChart(trades) {
   const lastVal = points[points.length - 1];
   const changeAbs = lastVal - startingBalance;
   const changePct = startingBalance > 0 ? (changeAbs / startingBalance) * 100 : null;
-  const isUp = changeAbs >= 0;
-  const strokeColor = isUp ? "#34d399" : "#f87171";
+  const strokeColor = "#ffffff";
 
   changeEl.textContent = changePct !== null
     ? `${formatPnl(changeAbs, isBacktest)} (${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%)`
     : formatPnl(changeAbs, isBacktest);
-  changeEl.className = "growth-change " + (isUp ? "pos" : "neg");
+  changeEl.className = "growth-change pnl-value neu";
 
-  startLabel.textContent = `Start · ${formatPnl(startingBalance, isBacktest)}`;
-  endLabel.textContent = `${chrono[chrono.length - 1].date} · ${formatPnl(lastVal, isBacktest)}`;
+  if (startLabel) startLabel.textContent = `Start · ${formatPnl(startingBalance, isBacktest)}`;
+  if (endLabel) endLabel.textContent = `${chrono[chrono.length - 1].date} · ${formatPnl(lastVal, isBacktest)}`;
 
   // 4 garis grid horizontal + label sumbu Y
   let gridLines = "";
@@ -1722,20 +1909,20 @@ function renderGrowthChart(trades) {
   for (let i = 0; i <= tickCount; i++) {
     const val = min + (range * i / tickCount);
     const y = padT + (h - padT - padB) - (i / tickCount) * (h - padT - padB);
-    gridLines += `<line x1="${padL}" y1="${y}" x2="${w - padR}" y2="${y}" stroke="#26272e" stroke-width="1" stroke-dasharray="3 4" />`;
+    gridLines += `<line x1="${padL}" y1="${y}" x2="${w - padR}" y2="${y}" stroke="#262626" stroke-width="1" stroke-dasharray="3 4" />`;
     const label = isBacktest ? `${val.toFixed(1)}R` : formatMoney(val).replace(".00", "");
-    gridLines += `<text x="${padL - 8}" y="${y + 3}" text-anchor="end" font-size="10" fill="#8b8d97" font-family="monospace">${label}</text>`;
+    gridLines += `<text x="${padL - 8}" y="${y + 3}" text-anchor="end" font-size="10" fill="#8a8a8e" font-family="monospace">${label}</text>`;
   }
 
   svg.innerHTML = `
     <defs>
-      <linearGradient id="growthFill" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="${strokeColor}" stop-opacity="0.28" />
+      <linearGradient id="growthFill${opts.svgId || "growth-svg"}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${strokeColor}" stop-opacity="0.22" />
         <stop offset="100%" stop-color="${strokeColor}" stop-opacity="0" />
       </linearGradient>
     </defs>
     ${gridLines}
-    <path d="${areaD}" fill="url(#growthFill)" stroke="none" />
+    <path d="${areaD}" fill="url(#growthFill${opts.svgId || "growth-svg"})" stroke="none" />
     <path d="${lineD}" fill="none" stroke="${strokeColor}" stroke-width="2.5" />
   `;
 }
@@ -2199,7 +2386,129 @@ function renderDashboard(accountTrades) {
   renderCalendarGrid(year, month, monthTradesForCalendar, monthNews);
   renderRecentTrades(accountTrades);
   renderDashboardStats(monthTrades, accountTrades);
+  renderDashboardHero(accountTrades);
 }
+
+function getCurrentWeekRange(now = new Date()) {
+  const dayIdx = (now.getDay() + 6) % 7; // Senin = 0
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - dayIdx);
+  monday.setHours(0, 0, 0, 0);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+  return { monday, sunday };
+}
+
+function renderDashboardHero(accountTrades) {
+  const account = getCurrentAccount();
+  const isBacktest = account?.type === "backtest";
+  const startingBalance = account?.startingBalance || 0;
+  const totalPnl = accountTrades.reduce((s, t) => s + (t.pnl || 0), 0);
+
+  const heroEl = document.getElementById("dash-total-pnl");
+  const heroSub = document.getElementById("dash-hero-sub");
+  if (heroEl) heroEl.textContent = formatPnl(totalPnl, isBacktest);
+
+  // ---- This week ----
+  const { monday, sunday } = getCurrentWeekRange();
+  const weekTrades = accountTrades.filter(t => {
+    if (!t.date) return false;
+    const d = new Date(t.date + "T00:00:00");
+    return d >= monday && d <= sunday;
+  });
+  const weekPnl = weekTrades.reduce((s, t) => s + (t.pnl || 0), 0);
+  const weekWins = weekTrades.filter(t => t.pnl > 0).length;
+  const weekWinrate = weekTrades.length ? Math.round((weekWins / weekTrades.length) * 100) : 0;
+
+  const fmtShort = (d) => `${d.getDate()} ${MONTH_NAMES_ID[d.getMonth()]}`;
+
+  if (heroSub) {
+    heroSub.textContent = accountTrades.length === 0
+      ? "Belum ada trade."
+      : `${weekTrades.length > 0 ? formatPnl(weekPnl, isBacktest) : "$0.00"} dalam 7 hari terakhir · ${accountTrades.length} trade total`;
+  }
+
+  const weekRangeEl = document.getElementById("dash-week-range");
+  if (weekRangeEl) weekRangeEl.textContent = `${fmtShort(monday)} – ${fmtShort(sunday)}`;
+  const weekPnlEl = document.getElementById("dash-week-pnl");
+  if (weekPnlEl) weekPnlEl.textContent = formatPnl(weekPnl, isBacktest);
+  const weekTradesEl = document.getElementById("dash-week-trades");
+  if (weekTradesEl) weekTradesEl.textContent = String(weekTrades.length);
+  const weekWinrateEl = document.getElementById("dash-week-winrate");
+  if (weekWinrateEl) weekWinrateEl.textContent = `${weekWinrate}%`;
+
+  // ---- Cumulative P&L chart (filterable: day/week/month/year/all) ----
+  lastDashAccountTrades = accountTrades;
+  renderDashGrowthChart();
+}
+
+let lastDashAccountTrades = [];
+let dashGrowthPeriod = "all";
+
+const DASH_GROWTH_PERIOD_LABEL = {
+  day: "Hari ini",
+  week: "Minggu ini",
+  month: "Bulan ini",
+  year: "Tahun ini",
+  all: "All time",
+};
+
+function filterTradesByPeriod(trades, period) {
+  if (period === "all") return trades;
+  const now = new Date();
+  if (period === "day") {
+    const todayStr = now.toISOString().slice(0, 10);
+    return trades.filter(t => t.date === todayStr);
+  }
+  if (period === "week") {
+    const { monday, sunday } = getCurrentWeekRange(now);
+    return trades.filter(t => {
+      if (!t.date) return false;
+      const d = new Date(t.date + "T00:00:00");
+      return d >= monday && d <= sunday;
+    });
+  }
+  if (period === "month") {
+    return trades.filter(t => {
+      if (!t.date) return false;
+      const d = new Date(t.date + "T00:00:00");
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    });
+  }
+  if (period === "year") {
+    return trades.filter(t => {
+      if (!t.date) return false;
+      const d = new Date(t.date + "T00:00:00");
+      return d.getFullYear() === now.getFullYear();
+    });
+  }
+  return trades;
+}
+
+function renderDashGrowthChart() {
+  const account = getCurrentAccount();
+  const periodTrades = filterTradesByPeriod(lastDashAccountTrades, dashGrowthPeriod);
+  const periodLabelEl = document.getElementById("dash-growth-period-label");
+  if (periodLabelEl) periodLabelEl.textContent = DASH_GROWTH_PERIOD_LABEL[dashGrowthPeriod] || "All time";
+
+  renderGrowthChart(periodTrades, {
+    svgId: "dash-growth-svg",
+    changeId: "dash-growth-change",
+    height: 140,
+    // "All time" starts the curve from the account's real starting balance;
+    // per-period views start from 0 so they show cumulative P&L for that window only.
+    startingBalanceOverride: dashGrowthPeriod === "all" ? (account?.startingBalance || 0) : 0,
+  });
+}
+
+document.querySelectorAll("#dash-growth-period-toggle button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    dashGrowthPeriod = btn.dataset.period;
+    document.querySelectorAll("#dash-growth-period-toggle button").forEach(b => b.classList.toggle("active", b === btn));
+    renderDashGrowthChart();
+  });
+});
 
 function renderCalendarGrid(year, month, monthTrades, monthNews) {
   calendarGrid.innerHTML = "";
@@ -2256,7 +2565,7 @@ function renderCalendarGrid(year, month, monthTrades, monthNews) {
       cell.innerHTML = `
         ${newsDotsHtml}
         <span class="cal-day-num">${day}</span>
-        <span class="cal-day-pnl">${formatNumCompact(pnl)}${isBacktest ? "R" : ""}</span>
+        <span class="cal-day-pnl pnl-value">${formatNumCompact(pnl)}${isBacktest ? "R" : ""}</span>
         <span class="cal-day-count">${dayTrades.length} trade${dayTrades.length > 1 ? "s" : ""}</span>
       `;
       cell.addEventListener("click", () => openDayDetail(year, month, day, dayTrades, dayNews));
@@ -2303,7 +2612,7 @@ function openDayDetail(year, month, day, dayTrades, dayNews) {
           <span class="dir-badge ${dirClass}">${t.position || "-"}</span>
           <span class="day-detail-item-pair">${escapeHtml(t.pair || "-")}</span>
         </div>
-        <span class="day-detail-item-pnl ${pnlClass}">${formatNum(t.pnl)}${isBacktest ? "R" : ""}</span>
+        <span class="day-detail-item-pnl pnl-value ${pnlClass}">${formatNum(t.pnl)}${isBacktest ? "R" : ""}</span>
       </div>
     `;
   }).join("");
@@ -2329,7 +2638,7 @@ function openDayDetail(year, month, day, dayTrades, dayNews) {
         </div>
         <div class="day-detail-pnl">
           <div class="day-detail-pnl-label">${isBacktest ? "Total R" : "Total P&L"}</div>
-          <div class="day-detail-pnl-value ${totalPnl > 0 ? 'pos' : totalPnl < 0 ? 'neg' : 'neu'}">${formatPnl(totalPnl, isBacktest)}</div>
+          <div class="day-detail-pnl-value pnl-value ${totalPnl > 0 ? 'pos' : totalPnl < 0 ? 'neg' : 'neu'}">${formatPnl(totalPnl, isBacktest)}</div>
         </div>
       </div>
       <div class="day-detail-list">${itemsHtml}</div>
@@ -2400,7 +2709,7 @@ function renderRecentTrades(accountTrades) {
           <span class="recent-item-pair">${escapeHtml(t.pair || "-")}</span>
           <span class="recent-item-date">${t.date || "-"} · ${escapeHtml(t.position || "-")}</span>
         </div>
-        <span class="recent-item-pnl ${pnlClass}">${formatNum(t.pnl)}${isBacktest ? "R" : ""}</span>
+        <span class="recent-item-pnl pnl-value ${pnlClass}">${formatNum(t.pnl)}${isBacktest ? "R" : ""}</span>
       </div>
     `;
   }).join("");
@@ -2436,7 +2745,7 @@ function renderDashboardStats(monthTrades, accountTrades) {
   document.getElementById("dash-pnl-sub").textContent = `${isBacktest ? "TOTAL R BULAN INI" : "P&L BULAN INI"} · ${label}`;
   const pnlEl = document.getElementById("dash-pnl");
   pnlEl.textContent = formatPnl(monthlyPnl, isBacktest);
-  pnlEl.className = "stat-value " + (monthlyPnl > 0 ? "pos" : monthlyPnl < 0 ? "neg" : "neu");
+  pnlEl.className = "stat-value pnl-value " + (monthlyPnl > 0 ? "pos" : monthlyPnl < 0 ? "neg" : "neu");
   document.getElementById("dash-profit").textContent = formatPnl(profitSum, isBacktest);
   document.getElementById("dash-loss").textContent = formatPnl(lossSum, isBacktest);
 

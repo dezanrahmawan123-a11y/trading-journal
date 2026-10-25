@@ -1,4 +1,4 @@
-const CACHE_NAME = "jurnal-trading-shell-v1";
+const CACHE_NAME = "jurnal-trading-shell-v2";
 const SHELL_FILES = ["/", "/index.html", "/style.css", "/app.js", "/manifest.json", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {
