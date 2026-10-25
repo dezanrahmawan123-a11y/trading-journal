@@ -707,23 +707,9 @@
           <input type="text" id="study-title" required placeholder="Contoh: Dasar Risk Management" />
         </div>
 
-        <!-- Mode LINK: isi URL manual -->
-        <div class="field hidden" id="study-url-field">
-          <label>Link / URL *</label>
-          <input type="text" id="study-url" placeholder="https://..." />
-        </div>
-
-        <!-- Mode PDF/VIDEO: upload file langsung -->
-        <div class="field full hidden" id="study-file-field">
-          <label id="study-file-label">File *</label>
-          <input type="file" id="study-file-input" class="hidden" />
-          <button type="button" class="btn-upload" id="study-file-trigger">📤 Pilih File</button>
-          <div id="study-file-current" class="study-file-current hidden"></div>
-          <div id="study-file-progress" class="study-file-progress hidden">
-            <div class="study-file-progress-bar" id="study-file-progress-bar"></div>
-            <span id="study-file-progress-label">Mengupload... 0%</span>
-          </div>
-          <p class="study-file-hint" id="study-file-hint">Maks. 20MB buat PDF.</p>
+        <div class="field full">
+          <label id="study-url-label">Link / URL *</label>
+          <input type="text" id="study-url" required placeholder="https://..." />
         </div>
 
         <div class="field full">

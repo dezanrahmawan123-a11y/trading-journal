@@ -14,14 +14,10 @@ import {
   getFirestore, collection, addDoc, updateDoc, deleteDoc,
   doc, setDoc, onSnapshot, query, orderBy, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import {
-  getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const storage = getStorage(app);
 
 // ============================================================
 // GANTI INI dengan User UID akun lo sendiri (lihat panduan di chat).
@@ -675,94 +671,50 @@ const studyModalOverlay = document.getElementById("study-modal-overlay");
 const studyModalTitle = document.getElementById("study-modal-title");
 const studyModalError = document.getElementById("study-modal-error");
 const studyForm = document.getElementById("study-form");
+const studyUrlLabel = document.getElementById("study-url-label");
 const studyCancelBtn = document.getElementById("study-cancel-btn");
 const studyDeleteBtn = document.getElementById("study-delete-btn");
-const studyUrlField = document.getElementById("study-url-field");
-const studyFileField = document.getElementById("study-file-field");
-const studyFileLabel = document.getElementById("study-file-label");
-const studyFileHint = document.getElementById("study-file-hint");
-const studyFileInput = document.getElementById("study-file-input");
-const studyFileTrigger = document.getElementById("study-file-trigger");
-const studyFileCurrent = document.getElementById("study-file-current");
-const studyFileProgress = document.getElementById("study-file-progress");
-const studyFileProgressBar = document.getElementById("study-file-progress-bar");
-const studyFileProgressLabel = document.getElementById("study-file-progress-label");
-const studySaveBtn = document.getElementById("study-save-btn");
 
 const STUDY_TYPE_LABEL = { pdf: "📄 PDF", video: "🎥 Video", link: "🔗 Link" };
-const STUDY_MAX_MB = { pdf: 20, video: 150 };
-let studyPendingFile = null;
-let studyExisting = null; // item lagi di-edit (buat tau url/storagePath lama)
+const STUDY_URL_LABEL = { pdf: "Link PDF *", video: "Link Video *", link: "Link / URL *" };
+const STUDY_URL_PLACEHOLDER = {
+  pdf: "https://drive.google.com/... atau link PDF lainnya",
+  video: "https://youtube.com/... atau link video lainnya",
+  link: "https://...",
+};
+
+function getYouTubeId(url) {
+  if (!url) return null;
+  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
 
 function getStudyType() {
   const typePill = document.querySelector("#study-type-group .pill.active");
   return typePill ? typePill.dataset.value : "pdf";
 }
 
-function refreshStudyFieldMode() {
+function refreshStudyUrlLabel() {
   const type = getStudyType();
-  studyPendingFile = null;
-  studyFileInput.value = "";
-  studyFileProgress.classList.add("hidden");
-
-  if (type === "link") {
-    studyUrlField.classList.remove("hidden");
-    studyFileField.classList.add("hidden");
-    document.getElementById("study-url").required = true;
-  } else {
-    studyUrlField.classList.add("hidden");
-    studyFileField.classList.remove("hidden");
-    document.getElementById("study-url").required = false;
-    studyFileLabel.textContent = type === "pdf" ? "File PDF *" : "File Video *";
-    studyFileTrigger.textContent = type === "pdf" ? "📤 Pilih File PDF" : "📤 Pilih File Video";
-    studyFileInput.accept = type === "pdf" ? "application/pdf" : "video/*";
-    studyFileHint.textContent = `Maks. ${STUDY_MAX_MB[type]}MB buat ${type === "pdf" ? "PDF" : "video"}.`;
-
-    if (studyExisting && studyExisting.type === type && studyExisting.fileName) {
-      studyFileCurrent.innerHTML = `File sekarang: <b>${escapeHtml(studyExisting.fileName)}</b> — pilih file baru buat ganti.`;
-      studyFileCurrent.classList.remove("hidden");
-    } else {
-      studyFileCurrent.classList.add("hidden");
-    }
-  }
+  studyUrlLabel.textContent = STUDY_URL_LABEL[type] || STUDY_URL_LABEL.link;
+  document.getElementById("study-url").placeholder = STUDY_URL_PLACEHOLDER[type] || STUDY_URL_PLACEHOLDER.link;
 }
 
-document.querySelectorAll("#study-type-group .pill").forEach(p => p.addEventListener("click", refreshStudyFieldMode));
-
-studyFileTrigger.addEventListener("click", () => studyFileInput.click());
-studyFileInput.addEventListener("change", () => {
-  const file = studyFileInput.files[0];
-  if (!file) { studyPendingFile = null; return; }
-  const type = getStudyType();
-  const maxBytes = (STUDY_MAX_MB[type] || 20) * 1024 * 1024;
-  if (file.size > maxBytes) {
-    studyModalError.textContent = `File kegedean. Maks ${STUDY_MAX_MB[type]}MB.`;
-    studyModalError.classList.remove("hidden");
-    studyFileInput.value = "";
-    studyPendingFile = null;
-    return;
-  }
-  studyModalError.classList.add("hidden");
-  studyPendingFile = file;
-  studyFileCurrent.innerHTML = `File dipilih: <b>${escapeHtml(file.name)}</b> (${(file.size / 1024 / 1024).toFixed(1)}MB)`;
-  studyFileCurrent.classList.remove("hidden");
-});
+document.querySelectorAll("#study-type-group .pill").forEach(p => p.addEventListener("click", refreshStudyUrlLabel));
 
 function openStudyModal(item = null) {
   studyForm.reset();
   studyModalError.classList.add("hidden");
-  studyExisting = item;
-  studyPendingFile = null;
   document.getElementById("study-id").value = item?.id || "";
   document.getElementById("study-title").value = item?.title || "";
-  document.getElementById("study-url").value = item?.type === "link" ? (item?.url || "") : "";
+  document.getElementById("study-url").value = item?.url || "";
   document.getElementById("study-description").value = item?.description || "";
   document.querySelectorAll("#study-type-group .pill").forEach(p => p.classList.remove("active"));
   const typePill = document.querySelector(`#study-type-group .pill[data-value="${item?.type || "pdf"}"]`);
   if (typePill) typePill.classList.add("active");
   studyModalTitle.textContent = item ? "Edit Materi" : "Tambah Materi";
   studyDeleteBtn.classList.toggle("hidden", !item);
-  refreshStudyFieldMode();
+  refreshStudyUrlLabel();
   studyModalOverlay.classList.remove("hidden");
 }
 
@@ -774,114 +726,35 @@ studyAddBtn.addEventListener("click", () => openStudyModal());
 studyCancelBtn.addEventListener("click", closeStudyModal);
 studyModalOverlay.addEventListener("click", (e) => { if (e.target === studyModalOverlay) closeStudyModal(); });
 
-function uploadStudyFile(file, type) {
-  return new Promise((resolve, reject) => {
-    const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
-    const path = `study_materials/${Date.now()}_${safeName}`;
-    const storageRef = ref(storage, path);
-    const task = uploadBytesResumable(storageRef, file);
-
-    studyFileProgress.classList.remove("hidden");
-    task.on(
-      "state_changed",
-      (snap) => {
-        const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
-        studyFileProgressBar.style.width = pct + "%";
-        studyFileProgressLabel.textContent = `Mengupload... ${pct}%`;
-      },
-      (err) => reject(err),
-      async () => {
-        const url = await getDownloadURL(task.snapshot.ref);
-        resolve({ url, storagePath: path, fileName: file.name });
-      }
-    );
-  });
-}
-
 studyForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   studyModalError.classList.add("hidden");
 
   const studyId = document.getElementById("study-id").value || null;
   const title = document.getElementById("study-title").value.trim();
+  const url = document.getElementById("study-url").value.trim();
   const description = document.getElementById("study-description").value.trim();
   const type = getStudyType();
 
-  if (!title) {
-    studyModalError.textContent = "Isi judul materinya.";
+  if (!title || !url) {
+    studyModalError.textContent = "Isi judul dan link/URL materinya.";
     studyModalError.classList.remove("hidden");
     return;
   }
 
-  let data = { title, description, type };
-
-  if (type === "link") {
-    const url = document.getElementById("study-url").value.trim();
-    if (!url) {
-      studyModalError.textContent = "Isi link/URL materinya.";
-      studyModalError.classList.remove("hidden");
-      return;
-    }
-    data.url = url;
-    data.fileName = null;
-    data.storagePath = null;
-  } else {
-    if (!studyPendingFile && !(studyExisting && studyExisting.type === type && studyExisting.url)) {
-      studyModalError.textContent = `Pilih file ${type === "pdf" ? "PDF" : "video"}-nya dulu.`;
-      studyModalError.classList.remove("hidden");
-      return;
-    }
-
-    if (studyPendingFile) {
-      studySaveBtn.disabled = true;
-      studySaveBtn.textContent = "Mengupload...";
-      try {
-        const uploaded = await uploadStudyFile(studyPendingFile, type);
-        data.url = uploaded.url;
-        data.storagePath = uploaded.storagePath;
-        data.fileName = uploaded.fileName;
-
-        // Hapus file lama di Storage kalau ini edit & gantiin file
-        if (studyExisting?.storagePath && studyExisting.storagePath !== uploaded.storagePath) {
-          deleteObject(ref(storage, studyExisting.storagePath)).catch(() => {});
-        }
-      } catch (err) {
-        studySaveBtn.disabled = false;
-        studySaveBtn.textContent = "Simpan";
-        studyFileProgress.classList.add("hidden");
-        studyModalError.textContent = "Gagal upload file. Coba lagi.";
-        studyModalError.classList.remove("hidden");
-        console.error(err);
-        return;
-      }
-    } else {
-      // edit tanpa ganti file - pertahanin file lama
-      data.url = studyExisting.url;
-      data.storagePath = studyExisting.storagePath || null;
-      data.fileName = studyExisting.fileName || null;
-    }
-  }
-
   try {
-    await saveStudy(data, studyId);
+    await saveStudy({ title, url, description, type }, studyId);
     closeStudyModal();
   } catch (err) {
     studyModalError.textContent = "Gagal menyimpan. Coba lagi.";
     studyModalError.classList.remove("hidden");
     console.error(err);
-  } finally {
-    studySaveBtn.disabled = false;
-    studySaveBtn.textContent = "Simpan";
-    studyFileProgress.classList.add("hidden");
   }
 });
 
 studyDeleteBtn.addEventListener("click", async () => {
   const studyId = document.getElementById("study-id").value;
   if (studyId && confirm("Hapus materi ini?")) {
-    if (studyExisting?.storagePath) {
-      deleteObject(ref(storage, studyExisting.storagePath)).catch(() => {});
-    }
     await removeStudy(studyId);
     closeStudyModal();
   }
@@ -895,6 +768,8 @@ function renderStudy() {
     const card = document.createElement("div");
     card.className = "study-card";
 
+    const ytId = item.type === "video" ? getYouTubeId(item.url) : null;
+    const isDirectVideoFile = item.type === "video" && !ytId && /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(item.url || "");
     const openLabel = item.type === "pdf" ? "Buka PDF" : item.type === "video" ? "Buka Video" : "Buka Link";
 
     card.innerHTML = `
@@ -909,17 +784,15 @@ function renderStudy() {
       </div>
       <h4>${escapeHtml(item.title || "")}</h4>
       ${item.description ? `<p>${escapeHtml(item.description)}</p>` : ""}
-      ${item.type === "video" ? `<video class="study-card-video" src="${escapeHtml(item.url || "")}" controls preload="metadata"></video>` : ""}
-      <a class="study-card-open" href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener noreferrer">${openLabel} ↗</a>
+      ${ytId ? `<div class="study-card-embed"><iframe src="https://www.youtube.com/embed/${ytId}" title="${escapeHtml(item.title || "")}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>` : ""}
+      ${isDirectVideoFile ? `<video class="study-card-video" src="${escapeHtml(item.url || "")}" controls preload="metadata"></video>` : ""}
+      <a class="study-card-open" href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener noreferrer">${ytId ? "Buka di YouTube" : openLabel} ↗</a>
     `;
 
     if (isAdminUser) {
       card.querySelector(".study-edit-btn").addEventListener("click", () => openStudyModal(item));
       card.querySelector(".study-del-btn").addEventListener("click", async () => {
-        if (confirm("Hapus materi ini?")) {
-          if (item.storagePath) deleteObject(ref(storage, item.storagePath)).catch(() => {});
-          await removeStudy(item.id);
-        }
+        if (confirm("Hapus materi ini?")) await removeStudy(item.id);
       });
     }
 
