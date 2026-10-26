@@ -819,7 +819,14 @@
               <label>Sound</label>
               <input type="range" id="sc-sound-slider" min="0" max="100" value="70" />
             </div>
-            <p class="sc-field-hint">Drag kartu di preview buat geser posisi background.</p>
+            <div class="sc-field hidden" id="sc-zoom-field">
+              <label>Zoom</label>
+              <input type="range" id="sc-zoom-slider" min="100" max="400" value="100" />
+              <div class="sc-zoom-row">
+                <span class="sc-field-hint">Drag buat geser, scroll / pinch buat zoom.</span>
+                <button type="button" class="btn btn-ghost sc-center-btn" id="sc-center-btn">Center</button>
+              </div>
+            </div>
           </div>
 
           <!-- FORMAT -->

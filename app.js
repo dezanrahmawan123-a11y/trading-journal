@@ -1347,6 +1347,9 @@ const scTrimStartSlider = document.getElementById("sc-trim-start");
 const scTrimEndSlider = document.getElementById("sc-trim-end");
 const scTrimLabel = document.getElementById("sc-trim-label");
 const scDimSlider = document.getElementById("sc-dim-slider");
+const scZoomField = document.getElementById("sc-zoom-field");
+const scZoomSlider = document.getElementById("sc-zoom-slider");
+const scCenterBtn = document.getElementById("sc-center-btn");
 const scSoundField = document.getElementById("sc-sound-field");
 const scSoundSlider = document.getElementById("sc-sound-slider");
 const scSaveDefaultBtn = document.getElementById("sc-save-default-btn");
@@ -1369,6 +1372,7 @@ let scBgType = null; // "image" | "video" | null
 let scBgEl = null;
 let scBgObjectUrl = null;
 let scPos = { x: 0, y: 0 };
+let scZoom = 1;
 let scDim = 35;
 let scTrimStart = 0;
 let scTrimEnd = 0;
@@ -1422,7 +1426,7 @@ function scDrawBackground(ctx, w, h) {
     const mediaH = scBgType === "image" ? scBgEl.naturalHeight : scBgEl.videoHeight;
     const ready = scBgType === "image" ? scBgEl.complete : scBgEl.readyState >= 2;
     if (ready && mediaW && mediaH) {
-      const scale = Math.max(w / mediaW, h / mediaH);
+      const scale = Math.max(w / mediaW, h / mediaH) * scZoom;
       const dw = mediaW * scale, dh = mediaH * scale;
       const minX = w - dw, minY = h - dh;
       const dx = Math.min(0, Math.max(minX, (w - dw) / 2 + scPos.x));
@@ -1772,6 +1776,7 @@ function updateScAdjustFieldsVisibility() {
   const isVideo = scBgType === "video";
   scTrimField.classList.toggle("hidden", !isVideo);
   scSoundField.classList.toggle("hidden", !isVideo);
+  scZoomField.classList.toggle("hidden", !scBgType);
 }
 
 function updateScExportAvailability() {
@@ -1806,6 +1811,8 @@ function loadScBackground(file) {
   stopScVideoLoop();
   if (scBgObjectUrl) { URL.revokeObjectURL(scBgObjectUrl); scBgObjectUrl = null; }
   scPos = { x: 0, y: 0 };
+  scZoom = 1;
+  if (scZoomSlider) scZoomSlider.value = 100;
   const url = URL.createObjectURL(file);
   scBgObjectUrl = url;
 
@@ -1848,6 +1855,8 @@ function removeScBackground() {
   scBgEl = null;
   if (scBgObjectUrl) { URL.revokeObjectURL(scBgObjectUrl); scBgObjectUrl = null; }
   scPos = { x: 0, y: 0 };
+  scZoom = 1;
+  if (scZoomSlider) scZoomSlider.value = 100;
   scBgRemoveBtn.classList.add("hidden");
   updateScAdjustFieldsVisibility();
   updateScExportAvailability();
@@ -1877,18 +1886,58 @@ window.addEventListener("mousemove", (e) => {
 });
 window.addEventListener("mouseup", () => { scDragging = false; });
 scCanvas.addEventListener("touchstart", (e) => {
+  if (e.touches.length > 1) return;
   scDragging = true;
   const p = scGetPointerXY(e);
   scDragStart = { x: p.x, y: p.y, origX: scPos.x, origY: scPos.y };
 }, { passive: true });
 scCanvas.addEventListener("touchmove", (e) => {
-  if (!scDragging) return;
+  if (!scDragging || e.touches.length > 1) return;
   const p = scGetPointerXY(e);
   scPos.x = scDragStart.origX + (p.x - scDragStart.x);
   scPos.y = scDragStart.origY + (p.y - scDragStart.y);
   if (scBgType !== "video") drawScCard();
 }, { passive: true });
 scCanvas.addEventListener("touchend", () => { scDragging = false; });
+
+function setScZoom(z) {
+  scZoom = Math.min(4, Math.max(1, z));
+  scZoomSlider.value = Math.round(scZoom * 100);
+  if (scBgType !== "video") drawScCard();
+}
+
+scZoomSlider.addEventListener("input", () => setScZoom(Number(scZoomSlider.value) / 100));
+scCenterBtn.addEventListener("click", () => {
+  scPos = { x: 0, y: 0 };
+  setScZoom(1);
+});
+
+scCanvas.addEventListener("wheel", (e) => {
+  if (!scBgType) return;
+  e.preventDefault();
+  setScZoom(scZoom * (e.deltaY < 0 ? 1.08 : 1 / 1.08));
+}, { passive: false });
+
+let scPinch = null;
+function scTouchDist(e) {
+  const a = e.touches[0], b = e.touches[1];
+  return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+}
+scCanvas.addEventListener("touchstart", (e) => {
+  if (e.touches.length === 2 && scBgType) {
+    scDragging = false;
+    scPinch = { dist: scTouchDist(e), zoom: scZoom };
+  }
+}, { passive: true });
+scCanvas.addEventListener("touchmove", (e) => {
+  if (scPinch && e.touches.length === 2) {
+    setScZoom(scPinch.zoom * (scTouchDist(e) / scPinch.dist));
+  }
+}, { passive: true });
+scCanvas.addEventListener("touchend", (e) => {
+  if (e.touches.length < 2) scPinch = null;
+  if (e.touches.length === 0) scDragging = false;
+});
 
 scBgUploadBtn.addEventListener("click", () => scBgFileInput.click());
 scBgFileInput.addEventListener("change", () => {

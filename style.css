@@ -2216,3 +2216,29 @@ button, .csel-trigger, .tab-btn, .pill, a {
   .sc-footer { flex-direction: column; align-items: stretch; }
   .sc-footer-hint { text-align: center; }
 }
+
+.sc-zoom-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sc-center-btn { padding: 6px 12px; font-size: 12px; flex: 0 0 auto; }
+
+/* ---------- Mobile fixes (ditaruh paling akhir biar menang urutan) ---------- */
+@media (max-width: 780px) {
+  html, body { overflow-x: hidden; }
+
+  /* Dashboard: Cumulative P&L & This Week ditumpuk */
+  .dash-chart-row { grid-template-columns: minmax(0, 1fr); gap: 14px; margin: 16px 0; }
+  .dash-chart-row > * { min-width: 0; }
+
+  /* Trade Log: grid gak boleh melebar ngikutin tabel; tabel scroll di dalam wrapper-nya sendiri */
+  .tradelog-layout { grid-template-columns: minmax(0, 1fr); }
+  .tradelog-layout > * { min-width: 0; }
+  .tradelog-sidebar { order: -1; }
+  .table-wrap { max-width: 100%; }
+
+  .toolbar { gap: 8px; }
+  .toolbar-filters { width: 100%; }
+  .toolbar-filters input { flex: 1 1 100%; min-width: 0; }
+
+  .chart-period-toggle { flex-wrap: wrap; }
+  .goals-row { flex-direction: column; }
+  .goal-col { padding: 12px 4px; }
+}
