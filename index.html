@@ -765,6 +765,133 @@
     </div>
   </div>
 
+  <!-- ===================== MODAL SHARE CARD (foto/video/gif estetik) ===================== -->
+  <div id="sc-modal-overlay" class="modal-overlay hidden">
+    <div class="modal sc-modal">
+      <div class="sc-head">
+        <h2>Share trade</h2>
+        <button type="button" class="sc-close-btn" id="sc-close-btn">✕</button>
+      </div>
+
+      <div class="sc-period-tabs" id="sc-period-tabs">
+        <button type="button" class="sc-ptab active" data-period="trade">Trade</button>
+        <button type="button" class="sc-ptab" data-period="day">Daily</button>
+        <button type="button" class="sc-ptab" data-period="week">Weekly</button>
+        <button type="button" class="sc-ptab" data-period="month">Monthly</button>
+      </div>
+
+      <div class="sc-body">
+        <div class="sc-preview-wrap">
+          <canvas id="sc-canvas" width="800" height="800"></canvas>
+          <div class="sc-drag-hint">Geser buat atur posisi background</div>
+        </div>
+
+        <div class="sc-controls">
+          <div class="sc-tabs" id="sc-tabs">
+            <button type="button" class="sc-tab active" data-tab="background">Background</button>
+            <button type="button" class="sc-tab" data-tab="adjust">Adjust</button>
+            <button type="button" class="sc-tab" data-tab="format">Format</button>
+          </div>
+
+          <!-- BACKGROUND -->
+          <div class="sc-panel" id="sc-panel-background">
+            <input type="file" id="sc-bg-file-input" accept="image/*,video/*" class="hidden" />
+            <button type="button" class="btn-upload sc-upload-btn" id="sc-bg-upload-btn">📤 Upload image, GIF, or video</button>
+            <button type="button" class="btn btn-ghost sc-remove-btn hidden" id="sc-bg-remove-btn">Remove background</button>
+            <p class="sc-field-hint">File dari device lo sendiri — foto, GIF, atau video jadi latar belakang kartu.</p>
+          </div>
+
+          <!-- ADJUST -->
+          <div class="sc-panel hidden" id="sc-panel-adjust">
+            <div class="sc-field hidden" id="sc-trim-field">
+              <label>Trim</label>
+              <div class="sc-trim-row">
+                <input type="range" id="sc-trim-start" min="0" max="1000" value="0" />
+                <input type="range" id="sc-trim-end" min="0" max="1000" value="1000" />
+              </div>
+              <span class="sc-field-hint" id="sc-trim-label">0.0s – 0.0s</span>
+            </div>
+            <div class="sc-field">
+              <label>Dim</label>
+              <input type="range" id="sc-dim-slider" min="0" max="100" value="35" />
+            </div>
+            <div class="sc-field hidden" id="sc-sound-field">
+              <label>Sound</label>
+              <input type="range" id="sc-sound-slider" min="0" max="100" value="70" />
+            </div>
+            <p class="sc-field-hint">Drag kartu di preview buat geser posisi background.</p>
+          </div>
+
+          <!-- FORMAT -->
+          <div class="sc-panel hidden" id="sc-panel-format">
+            <div class="sc-field">
+              <label>Show</label>
+              <div class="sc-pill-group" data-key="show">
+                <button type="button" class="sc-pill active" data-value="amount">$</button>
+                <button type="button" class="sc-pill" data-value="percent">%</button>
+              </div>
+            </div>
+            <div class="sc-field">
+              <label>Style</label>
+              <div class="sc-pill-group" data-key="style">
+                <button type="button" class="sc-pill active" data-value="line">Line on top</button>
+                <button type="button" class="sc-pill" data-value="plain">P&amp;L only</button>
+              </div>
+            </div>
+            <div class="sc-field">
+              <label>Stats</label>
+              <div class="sc-pill-group" data-key="stats">
+                <button type="button" class="sc-pill active" data-value="boxed">Boxed</button>
+                <button type="button" class="sc-pill" data-value="plain">Plain</button>
+              </div>
+            </div>
+            <div class="sc-field">
+              <label>P&amp;L</label>
+              <div class="sc-pill-group" data-key="pnlBorder">
+                <button type="button" class="sc-pill active" data-value="border">Border</button>
+                <button type="button" class="sc-pill" data-value="noborder">No border</button>
+              </div>
+            </div>
+            <div class="sc-field">
+              <label>Corners</label>
+              <div class="sc-pill-group" data-key="corners">
+                <button type="button" class="sc-pill active" data-value="rounded">Rounded</button>
+                <button type="button" class="sc-pill" data-value="straight">Straight</button>
+              </div>
+            </div>
+            <div class="sc-field">
+              <label>Size</label>
+              <div class="sc-pill-group sc-pill-group-5" data-key="size">
+                <button type="button" class="sc-pill" data-value="landscape" title="Landscape">▭</button>
+                <button type="button" class="sc-pill" data-value="portrait" title="Portrait">▯</button>
+                <button type="button" class="sc-pill" data-value="16:9" title="16:9">16:9</button>
+                <button type="button" class="sc-pill active" data-value="square" title="Square">◻</button>
+                <button type="button" class="sc-pill" data-value="4:5" title="4:5">4:5</button>
+              </div>
+            </div>
+            <div class="sc-field">
+              <label>Quality</label>
+              <div class="sc-pill-group" data-key="quality">
+                <button type="button" class="sc-pill active" data-value="standard">Standard</button>
+                <button type="button" class="sc-pill" data-value="high">High-res</button>
+              </div>
+            </div>
+            <button type="button" class="btn btn-ghost sc-save-default-btn" id="sc-save-default-btn">Save as my default</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sc-footer">
+        <span class="sc-footer-hint" id="sc-footer-hint"></span>
+        <div class="sc-footer-actions">
+          <button type="button" class="btn btn-ghost" id="sc-export-video">🎬 Video</button>
+          <button type="button" class="btn btn-ghost" id="sc-export-gif">GIF</button>
+          <button type="button" class="btn btn-primary" id="sc-export-photo">⬇ Photo</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ===================== MODAL ADMIN: KELOLA USER BARU ===================== -->
   <div id="admin-modal-overlay" class="modal-overlay hidden">
     <div class="modal">

@@ -1332,6 +1332,700 @@ function showShareLinkPanel(shareId) {
   };
 }
 
+// ============================================================
+// SHARE CARD (foto/video/gif estetik buat posting ke sosmed)
+// ============================================================
+
+const scModalOverlay = document.getElementById("sc-modal-overlay");
+const scCloseBtn = document.getElementById("sc-close-btn");
+const scCanvas = document.getElementById("sc-canvas");
+const scBgFileInput = document.getElementById("sc-bg-file-input");
+const scBgUploadBtn = document.getElementById("sc-bg-upload-btn");
+const scBgRemoveBtn = document.getElementById("sc-bg-remove-btn");
+const scTrimField = document.getElementById("sc-trim-field");
+const scTrimStartSlider = document.getElementById("sc-trim-start");
+const scTrimEndSlider = document.getElementById("sc-trim-end");
+const scTrimLabel = document.getElementById("sc-trim-label");
+const scDimSlider = document.getElementById("sc-dim-slider");
+const scSoundField = document.getElementById("sc-sound-field");
+const scSoundSlider = document.getElementById("sc-sound-slider");
+const scSaveDefaultBtn = document.getElementById("sc-save-default-btn");
+const scExportPhotoBtn = document.getElementById("sc-export-photo");
+const scExportVideoBtn = document.getElementById("sc-export-video");
+const scExportGifBtn = document.getElementById("sc-export-gif");
+const scFooterHint = document.getElementById("sc-footer-hint");
+
+const SC_SIZE_PRESETS = {
+  landscape: { w: 1000, h: 650 },
+  portrait: { w: 700, h: 1000 },
+  "16:9": { w: 1000, h: 562 },
+  square: { w: 800, h: 800 },
+  "4:5": { w: 800, h: 1000 },
+};
+
+let scTrade = null;
+let scPeriod = "trade";
+let scBgType = null; // "image" | "video" | null
+let scBgEl = null;
+let scBgObjectUrl = null;
+let scPos = { x: 0, y: 0 };
+let scDim = 35;
+let scTrimStart = 0;
+let scTrimEnd = 0;
+let scSound = 70;
+let scFormat = {
+  show: "amount", style: "line", stats: "boxed",
+  pnlBorder: "border", corners: "rounded", size: "square", quality: "standard",
+};
+let scRafId = null;
+let scDragging = false;
+let scDragStart = null;
+let scGifJsLoaded = false;
+
+function loadScFormatDefaults() {
+  try {
+    const raw = localStorage.getItem("jt_share_card_format");
+    if (raw) scFormat = { ...scFormat, ...JSON.parse(raw) };
+  } catch (e) { /* ignore */ }
+}
+loadScFormatDefaults();
+
+function syncScFormatUI() {
+  document.querySelectorAll("#sc-panel-format .sc-pill-group").forEach(group => {
+    const key = group.dataset.key;
+    group.querySelectorAll(".sc-pill").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.value === scFormat[key]);
+    });
+  });
+}
+
+function getScDims() {
+  const preset = SC_SIZE_PRESETS[scFormat.size] || SC_SIZE_PRESETS.square;
+  const scale = scFormat.quality === "high" ? 2 : 1;
+  return { w: preset.w * scale, h: preset.h * scale };
+}
+
+function scRoundRectPath(ctx, x, y, w, h, r) {
+  const rr = Math.max(0, Math.min(r, w / 2, h / 2));
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
+}
+
+function scDrawBackground(ctx, w, h) {
+  if (scBgEl && scBgType) {
+    const mediaW = scBgType === "image" ? scBgEl.naturalWidth : scBgEl.videoWidth;
+    const mediaH = scBgType === "image" ? scBgEl.naturalHeight : scBgEl.videoHeight;
+    const ready = scBgType === "image" ? scBgEl.complete : scBgEl.readyState >= 2;
+    if (ready && mediaW && mediaH) {
+      const scale = Math.max(w / mediaW, h / mediaH);
+      const dw = mediaW * scale, dh = mediaH * scale;
+      const minX = w - dw, minY = h - dh;
+      const dx = Math.min(0, Math.max(minX, (w - dw) / 2 + scPos.x));
+      const dy = Math.min(0, Math.max(minY, (h - dh) / 2 + scPos.y));
+      ctx.drawImage(scBgEl, dx, dy, dw, dh);
+      return;
+    }
+  }
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, "#1a1a1d");
+  grad.addColorStop(1, "#000000");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+}
+
+function getScSparkSeries(accountTrades) {
+  if (scPeriod === "trade" && scTrade) {
+    const idx = accountTrades.findIndex(x => x.id === scTrade.id);
+    const end = idx >= 0 ? idx + 1 : accountTrades.length;
+    const start = Math.max(0, end - 20);
+    return accountTrades.slice(start, end).map(x => x.pnl || 0);
+  }
+  return filterTradesByPeriod(accountTrades, scPeriod).map(x => x.pnl || 0);
+}
+
+function getScCardData() {
+  const account = getCurrentAccount();
+  const isBacktest = account?.type === "backtest";
+  const accountTrades = getAccountTrades().slice().sort((a, b) => (a.date < b.date ? -1 : 1));
+
+  if (scPeriod === "trade" && scTrade) {
+    const t = scTrade;
+    return {
+      isBacktest,
+      title: t.pair || "-",
+      subtitle: `${t.position || "-"} · ${t.date || "-"}`,
+      pnl: t.pnl || 0,
+      pct: account?.startingBalance ? ((t.pnl || 0) / account.startingBalance) * 100 : null,
+      stats: [
+        { label: "Direction", value: t.position || "-" },
+        { label: "R:R", value: t.riskReward || "-" },
+        { label: "Result", value: t.result || "-" },
+      ],
+      sparkSeries: getScSparkSeries(accountTrades),
+    };
+  }
+
+  const periodTrades = filterTradesByPeriod(accountTrades, scPeriod);
+  const pnl = periodTrades.reduce((s2, x) => s2 + (x.pnl || 0), 0);
+  const wins = periodTrades.filter(x => x.pnl > 0).length;
+  const winrate = periodTrades.length ? Math.round((wins / periodTrades.length) * 100) : 0;
+  const periodLabel = { day: "Today", week: "This Week", month: "This Month" }[scPeriod] || "";
+
+  return {
+    isBacktest,
+    title: account?.name || "Jurnal Trading",
+    subtitle: periodLabel,
+    pnl,
+    pct: account?.startingBalance ? (pnl / account.startingBalance) * 100 : null,
+    stats: [
+      { label: "Trades", value: String(periodTrades.length) },
+      { label: "Win rate", value: `${winrate}%` },
+      { label: "Period", value: periodLabel },
+    ],
+    sparkSeries: periodTrades.map(x => x.pnl || 0),
+  };
+}
+
+function scFormatValue(data) {
+  if (data.isBacktest) return formatPnl(data.pnl, true);
+  if (scFormat.show === "percent" && data.pct !== null && data.pct !== undefined) {
+    const sign = data.pct > 0 ? "+" : "";
+    return `${sign}${data.pct.toFixed(2)}%`;
+  }
+  return formatPnl(data.pnl, false);
+}
+
+function scDrawSparkline(ctx, x, y, w, h, series, s) {
+  const pts = (!series || series.length < 2) ? [0, 0] : (() => {
+    let cum = 0;
+    return series.map(v => (cum += v));
+  })();
+  const min = Math.min(0, ...pts);
+  const max = Math.max(0, ...pts);
+  const range = (max - min) || 1;
+  const stepX = w / (pts.length - 1 || 1);
+  const pathPoints = pts.map((v, i) => ({ x: x + i * stepX, y: y + h - ((v - min) / range) * h }));
+
+  ctx.beginPath();
+  pathPoints.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+  ctx.lineTo(x + w, y + h);
+  ctx.lineTo(x, y + h);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0, y, 0, y + h);
+  grad.addColorStop(0, "rgba(255,255,255,0.22)");
+  grad.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  ctx.beginPath();
+  pathPoints.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+  ctx.strokeStyle = "rgba(255,255,255,0.9)";
+  ctx.lineWidth = 2.4 * s;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.stroke();
+}
+
+function scDrawStatsRow(ctx, x, y, w, h, stats, s) {
+  const n = stats.length || 1;
+  const itemW = w / n;
+  stats.forEach((item, i) => {
+    const cx = x + itemW * i + itemW / 2;
+    if (scFormat.stats === "boxed") {
+      const boxW = itemW - 10 * s;
+      const boxX = cx - boxW / 2;
+      ctx.fillStyle = "rgba(255,255,255,0.08)";
+      scRoundRectPath(ctx, boxX, y, boxW, h, 9 * s);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.14)";
+      ctx.lineWidth = 1 * s;
+      scRoundRectPath(ctx, boxX, y, boxW, h, 9 * s);
+      ctx.stroke();
+    }
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.font = `700 ${9 * s}px Inter, sans-serif`;
+    ctx.fillText(String(item.label).toUpperCase(), cx, y + h * 0.4);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `700 ${13 * s}px 'JetBrains Mono', monospace`;
+    ctx.fillText(String(item.value), cx, y + h * 0.8);
+  });
+  ctx.textAlign = "left";
+}
+
+function scDrawCardContent(ctx, w, h, s) {
+  const data = getScCardData();
+
+  // ---- top info pill ----
+  ctx.textBaseline = "top";
+  ctx.font = `700 ${15 * s}px Inter, sans-serif`;
+  const titleW = ctx.measureText(data.title).width;
+  ctx.font = `500 ${11 * s}px 'JetBrains Mono', monospace`;
+  const subtitleW = ctx.measureText(data.subtitle).width;
+  const pillPadX = 14 * s;
+  const pillW = Math.max(titleW, subtitleW) + pillPadX * 2;
+  const pillH = 46 * s;
+  const pillX = 26 * s, pillY = 24 * s;
+
+  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  scRoundRectPath(ctx, pillX, pillY, pillW, pillH, 10 * s);
+  ctx.fill();
+
+  ctx.fillStyle = "#ffffff";
+  ctx.font = `700 ${15 * s}px Inter, sans-serif`;
+  ctx.fillText(data.title, pillX + pillPadX, pillY + 7 * s);
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  ctx.font = `500 ${11 * s}px 'JetBrains Mono', monospace`;
+  ctx.fillText(data.subtitle, pillX + pillPadX, pillY + 25 * s);
+
+  // ---- bottom stats block ----
+  const blockPad = 30 * s;
+  const blockW = w - blockPad * 2;
+  const bottomMargin = 28 * s;
+
+  const statsH = scFormat.stats === "boxed" ? 58 * s : 32 * s;
+  const statsY = h - bottomMargin - statsH;
+
+  const pnlH = 78 * s;
+  const pnlBottom = statsY - 14 * s;
+  const pnlTop = pnlBottom - pnlH;
+
+  let sparkH = 0, sparkY = pnlTop;
+  if (scFormat.style === "line") {
+    sparkH = 60 * s;
+    sparkY = pnlTop - 14 * s - sparkH;
+  }
+
+  const blockTop = (scFormat.style === "line" ? sparkY : pnlTop) - 22 * s;
+  const blockBottom = statsY + statsH + 18 * s;
+
+  if (scFormat.pnlBorder === "border") {
+    ctx.strokeStyle = "rgba(255,255,255,0.22)";
+    ctx.lineWidth = 1.4 * s;
+    ctx.fillStyle = "rgba(0,0,0,0.22)";
+    const r = scFormat.corners === "rounded" ? 16 * s : 0;
+    scRoundRectPath(ctx, blockPad - 14 * s, blockTop, blockW + 28 * s, blockBottom - blockTop, r);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  if (scFormat.style === "line") {
+    scDrawSparkline(ctx, blockPad, sparkY, blockW, sparkH, data.sparkSeries, s);
+  }
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  ctx.font = `800 ${58 * s}px Manrope, sans-serif`;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(scFormatValue(data), w / 2, pnlBottom - 6 * s);
+  ctx.textAlign = "left";
+
+  scDrawStatsRow(ctx, blockPad, statsY, blockW, statsH, data.stats, s);
+
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.font = `700 ${12 * s}px Manrope, sans-serif`;
+  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  ctx.fillText("Jurnal Trading", blockPad, h - 10 * s);
+}
+
+function drawScCard() {
+  if (!scCanvas) return;
+  const dims = getScDims();
+  if (scCanvas.width !== dims.w) scCanvas.width = dims.w;
+  if (scCanvas.height !== dims.h) scCanvas.height = dims.h;
+
+  const qualityScale = scFormat.quality === "high" ? 2 : 1;
+  const w = dims.w / qualityScale;
+  const h = dims.h / qualityScale;
+  const s = w / 800;
+
+  const ctx = scCanvas.getContext("2d");
+  ctx.clearRect(0, 0, dims.w, dims.h);
+  ctx.save();
+  ctx.scale(qualityScale, qualityScale);
+
+  const radius = scFormat.corners === "rounded" ? Math.round(Math.min(w, h) * 0.045) : 0;
+  scRoundRectPath(ctx, 0, 0, w, h, radius);
+  ctx.clip();
+
+  scDrawBackground(ctx, w, h);
+  ctx.fillStyle = `rgba(0,0,0,${scDim / 100})`;
+  ctx.fillRect(0, 0, w, h);
+
+  scDrawCardContent(ctx, w, h, s);
+
+  ctx.restore();
+}
+
+function applyScSoundToVideo() {
+  if (scBgEl && scBgType === "video") {
+    scBgEl.volume = scSound / 100;
+    scBgEl.muted = scSound === 0;
+  }
+}
+
+function updateScTrimLabel() {
+  scTrimLabel.textContent = `${scTrimStart.toFixed(1)}s – ${scTrimEnd.toFixed(1)}s`;
+}
+
+function updateScTrimUI() {
+  scTrimStartSlider.value = 0;
+  scTrimEndSlider.value = 1000;
+  updateScTrimLabel();
+}
+
+function updateScAdjustFieldsVisibility() {
+  const isVideo = scBgType === "video";
+  scTrimField.classList.toggle("hidden", !isVideo);
+  scSoundField.classList.toggle("hidden", !isVideo);
+}
+
+function updateScExportAvailability() {
+  const isVideo = scBgType === "video";
+  const canMedia = typeof scCanvas.captureStream === "function";
+  scExportVideoBtn.disabled = !(isVideo && canMedia);
+  scExportGifBtn.disabled = !isVideo;
+  scExportVideoBtn.title = isVideo ? "" : "Perlu background video buat export video";
+  scExportGifBtn.title = isVideo ? "" : "Perlu background video buat export GIF";
+}
+
+function stopScVideoLoop() {
+  if (scRafId) { cancelAnimationFrame(scRafId); scRafId = null; }
+  if (scBgEl && scBgType === "video") { try { scBgEl.pause(); } catch (e) {} }
+}
+
+function startScVideoPreviewLoop() {
+  if (!scBgEl || scBgType !== "video") return;
+  scBgEl.play().catch(() => {});
+  const loop = () => {
+    if (scBgType !== "video" || !scBgEl) return;
+    if (scBgEl.currentTime >= scTrimEnd || scBgEl.currentTime < scTrimStart) {
+      scBgEl.currentTime = scTrimStart;
+    }
+    drawScCard();
+    scRafId = requestAnimationFrame(loop);
+  };
+  scRafId = requestAnimationFrame(loop);
+}
+
+function loadScBackground(file) {
+  stopScVideoLoop();
+  if (scBgObjectUrl) { URL.revokeObjectURL(scBgObjectUrl); scBgObjectUrl = null; }
+  scPos = { x: 0, y: 0 };
+  const url = URL.createObjectURL(file);
+  scBgObjectUrl = url;
+
+  if (file.type.startsWith("video/")) {
+    scBgType = "video";
+    const video = document.createElement("video");
+    video.src = url;
+    video.muted = true;
+    video.playsInline = true;
+    video.loop = true;
+    scBgEl = video;
+    video.addEventListener("loadedmetadata", () => {
+      scTrimStart = 0;
+      scTrimEnd = video.duration || 0;
+      updateScTrimUI();
+      applyScSoundToVideo();
+      video.currentTime = scTrimStart;
+      startScVideoPreviewLoop();
+      updateScAdjustFieldsVisibility();
+      updateScExportAvailability();
+    }, { once: true });
+  } else {
+    scBgType = "image";
+    const img = new Image();
+    img.onload = () => {
+      scBgEl = img;
+      updateScAdjustFieldsVisibility();
+      updateScExportAvailability();
+      drawScCard();
+    };
+    img.src = url;
+  }
+
+  scBgRemoveBtn.classList.remove("hidden");
+}
+
+function removeScBackground() {
+  stopScVideoLoop();
+  scBgType = null;
+  scBgEl = null;
+  if (scBgObjectUrl) { URL.revokeObjectURL(scBgObjectUrl); scBgObjectUrl = null; }
+  scPos = { x: 0, y: 0 };
+  scBgRemoveBtn.classList.add("hidden");
+  updateScAdjustFieldsVisibility();
+  updateScExportAvailability();
+  drawScCard();
+}
+
+function scGetPointerXY(e) {
+  const rect = scCanvas.getBoundingClientRect();
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  const scaleX = scCanvas.width / rect.width;
+  const scaleY = scCanvas.height / rect.height;
+  return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+}
+
+scCanvas.addEventListener("mousedown", (e) => {
+  scDragging = true;
+  const p = scGetPointerXY(e);
+  scDragStart = { x: p.x, y: p.y, origX: scPos.x, origY: scPos.y };
+});
+window.addEventListener("mousemove", (e) => {
+  if (!scDragging) return;
+  const p = scGetPointerXY(e);
+  scPos.x = scDragStart.origX + (p.x - scDragStart.x);
+  scPos.y = scDragStart.origY + (p.y - scDragStart.y);
+  if (scBgType !== "video") drawScCard();
+});
+window.addEventListener("mouseup", () => { scDragging = false; });
+scCanvas.addEventListener("touchstart", (e) => {
+  scDragging = true;
+  const p = scGetPointerXY(e);
+  scDragStart = { x: p.x, y: p.y, origX: scPos.x, origY: scPos.y };
+}, { passive: true });
+scCanvas.addEventListener("touchmove", (e) => {
+  if (!scDragging) return;
+  const p = scGetPointerXY(e);
+  scPos.x = scDragStart.origX + (p.x - scDragStart.x);
+  scPos.y = scDragStart.origY + (p.y - scDragStart.y);
+  if (scBgType !== "video") drawScCard();
+}, { passive: true });
+scCanvas.addEventListener("touchend", () => { scDragging = false; });
+
+scBgUploadBtn.addEventListener("click", () => scBgFileInput.click());
+scBgFileInput.addEventListener("change", () => {
+  const file = scBgFileInput.files[0];
+  if (file) loadScBackground(file);
+});
+scBgRemoveBtn.addEventListener("click", removeScBackground);
+
+document.querySelectorAll("#sc-tabs .sc-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll("#sc-tabs .sc-tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    ["background", "adjust", "format"].forEach(name => {
+      document.getElementById(`sc-panel-${name}`).classList.toggle("hidden", name !== tab.dataset.tab);
+    });
+  });
+});
+
+document.querySelectorAll("#sc-period-tabs .sc-ptab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll("#sc-period-tabs .sc-ptab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    scPeriod = tab.dataset.period;
+    drawScCard();
+  });
+});
+
+document.querySelectorAll("#sc-panel-format .sc-pill-group").forEach(group => {
+  const key = group.dataset.key;
+  group.querySelectorAll(".sc-pill").forEach(btn => {
+    btn.addEventListener("click", () => {
+      group.querySelectorAll(".sc-pill").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      scFormat[key] = btn.dataset.value;
+      drawScCard();
+    });
+  });
+});
+
+scDimSlider.addEventListener("input", () => {
+  scDim = Number(scDimSlider.value);
+  if (scBgType !== "video") drawScCard();
+});
+
+scSoundSlider.addEventListener("input", () => {
+  scSound = Number(scSoundSlider.value);
+  applyScSoundToVideo();
+});
+
+scTrimStartSlider.addEventListener("input", () => {
+  if (!scBgEl || scBgType !== "video") return;
+  const duration = scBgEl.duration || 0;
+  let startSec = (Number(scTrimStartSlider.value) / 1000) * duration;
+  const endSec = (Number(scTrimEndSlider.value) / 1000) * duration;
+  if (startSec > endSec - 0.2) startSec = Math.max(0, endSec - 0.2);
+  scTrimStart = startSec;
+  scBgEl.currentTime = scTrimStart;
+  updateScTrimLabel();
+});
+scTrimEndSlider.addEventListener("input", () => {
+  if (!scBgEl || scBgType !== "video") return;
+  const duration = scBgEl.duration || 0;
+  let endSec = (Number(scTrimEndSlider.value) / 1000) * duration;
+  const startSec = (Number(scTrimStartSlider.value) / 1000) * duration;
+  if (endSec < startSec + 0.2) endSec = Math.min(duration, startSec + 0.2);
+  scTrimEnd = endSec;
+  updateScTrimLabel();
+});
+
+scSaveDefaultBtn.addEventListener("click", () => {
+  try {
+    localStorage.setItem("jt_share_card_format", JSON.stringify(scFormat));
+    scSaveDefaultBtn.textContent = "Tersimpan!";
+    setTimeout(() => { scSaveDefaultBtn.textContent = "Save as my default"; }, 1500);
+  } catch (e) { /* ignore */ }
+});
+
+scExportPhotoBtn.addEventListener("click", () => {
+  drawScCard();
+  scCanvas.toBlob((blob) => {
+    if (!blob) return;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `jurnal-trading-${scPeriod}-${Date.now()}.png`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }, "image/png");
+});
+
+async function scExportVideo() {
+  if (scBgType !== "video" || typeof scCanvas.captureStream !== "function") return;
+  scExportVideoBtn.disabled = true;
+  scFooterHint.textContent = "Lagi render video...";
+  try {
+    const stream = scCanvas.captureStream(30);
+    try {
+      if (scBgEl.captureStream) {
+        scBgEl.captureStream().getAudioTracks().forEach(t => stream.addTrack(t));
+      }
+    } catch (e) { /* no audio track, skip */ }
+
+    const mimeCandidates = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
+    const mimeType = mimeCandidates.find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || "video/webm";
+    const recorder = new MediaRecorder(stream, { mimeType });
+    const chunks = [];
+    recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+    const done = new Promise((resolve) => { recorder.onstop = resolve; });
+
+    scBgEl.currentTime = scTrimStart;
+    scBgEl.muted = scSound === 0;
+    scBgEl.volume = scSound / 100;
+    await scBgEl.play();
+    recorder.start();
+
+    const duration = Math.max(0.3, scTrimEnd - scTrimStart);
+    await new Promise(r => setTimeout(r, duration * 1000));
+
+    recorder.stop();
+    await done;
+
+    const blob = new Blob(chunks, { type: "video/webm" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `jurnal-trading-${scPeriod}-${Date.now()}.webm`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  } catch (err) {
+    console.error(err);
+    alert("Gagal export video. Browser lo mungkin gak support fitur ini.");
+  } finally {
+    scExportVideoBtn.disabled = false;
+    scFooterHint.textContent = "";
+    startScVideoPreviewLoop();
+  }
+}
+scExportVideoBtn.addEventListener("click", scExportVideo);
+
+function loadScGifJs() {
+  if (scGifJsLoaded && window.GIF) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.js";
+    script.onload = () => { scGifJsLoaded = true; resolve(); };
+    script.onerror = () => reject(new Error("Gagal load GIF encoder."));
+    document.head.appendChild(script);
+  });
+}
+
+async function scExportGif() {
+  if (scBgType !== "video") return;
+  scExportGifBtn.disabled = true;
+  scFooterHint.textContent = "Lagi render GIF...";
+  let workerUrl = null;
+  try {
+    await loadScGifJs();
+    const workerResp = await fetch("https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.js");
+    const workerBlob = await workerResp.blob();
+    workerUrl = URL.createObjectURL(workerBlob);
+
+    const gif = new window.GIF({
+      workers: 2, quality: 10, workerScript: workerUrl,
+      width: scCanvas.width, height: scCanvas.height,
+    });
+
+    scBgEl.currentTime = scTrimStart;
+    scBgEl.muted = true;
+    await scBgEl.play();
+
+    const fps = 10;
+    const duration = Math.max(0.3, scTrimEnd - scTrimStart);
+    const frameCount = Math.round(duration * fps);
+    const frameDelay = 1000 / fps;
+
+    for (let i = 0; i < frameCount; i++) {
+      drawScCard();
+      gif.addFrame(scCanvas, { copy: true, delay: frameDelay });
+      await new Promise(r => setTimeout(r, frameDelay));
+    }
+
+    const blob = await new Promise((resolve) => {
+      gif.on("finished", (b) => resolve(b));
+      gif.render();
+    });
+
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `jurnal-trading-${scPeriod}-${Date.now()}.gif`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  } catch (err) {
+    console.error(err);
+    alert("Gagal export GIF. Coba export Video sebagai gantinya.");
+  } finally {
+    if (workerUrl) URL.revokeObjectURL(workerUrl);
+    scExportGifBtn.disabled = false;
+    scFooterHint.textContent = "";
+    startScVideoPreviewLoop();
+  }
+}
+scExportGifBtn.addEventListener("click", scExportGif);
+
+function openShareCardModal(trade) {
+  scTrade = trade;
+  scPeriod = "trade";
+  document.querySelectorAll("#sc-period-tabs .sc-ptab").forEach(t => t.classList.toggle("active", t.dataset.period === "trade"));
+  document.querySelectorAll("#sc-tabs .sc-tab").forEach((t, i) => t.classList.toggle("active", i === 0));
+  document.getElementById("sc-panel-background").classList.remove("hidden");
+  document.getElementById("sc-panel-adjust").classList.add("hidden");
+  document.getElementById("sc-panel-format").classList.add("hidden");
+  removeScBackground();
+  loadScFormatDefaults();
+  syncScFormatUI();
+  scModalOverlay.classList.remove("hidden");
+  drawScCard();
+}
+
+function closeShareCardModal() {
+  stopScVideoLoop();
+  scModalOverlay.classList.add("hidden");
+}
+
+scCloseBtn.addEventListener("click", closeShareCardModal);
+scModalOverlay.addEventListener("click", (e) => { if (e.target === scModalOverlay) closeShareCardModal(); });
+
 function openTradeDetail(trade) {
   const pnlClass = trade.pnl > 0 ? "pos" : (trade.pnl < 0 ? "neg" : "neu");
   const dirClass = trade.position === "Buy" ? "dir-buy" : "dir-sell";
@@ -1432,13 +2126,15 @@ function openTradeDetail(trade) {
 
     <div class="detail-actions">
       <button type="button" class="btn btn-danger" id="detail-delete-btn" style="flex:0;">Hapus</button>
-      <button type="button" class="btn btn-ghost" id="detail-share-btn" style="flex:0;">🔗 Share</button>
+      <button type="button" class="btn btn-ghost" id="detail-sharecard-btn" style="flex:0;">🖼️ Share Card</button>
+      <button type="button" class="btn btn-ghost" id="detail-share-btn" style="flex:0;">🔗 Link</button>
       <button type="button" class="btn btn-ghost" id="detail-close-btn">Tutup</button>
       <button type="button" class="btn btn-primary" id="detail-edit-btn">Edit Trade</button>
     </div>
   `;
 
   document.getElementById("detail-share-btn").addEventListener("click", () => handleShareTrade(trade));
+  document.getElementById("detail-sharecard-btn").addEventListener("click", () => openShareCardModal(trade));
   if (trade.shareId) showShareLinkPanel(trade.shareId);
 
   document.getElementById("detail-close-btn").addEventListener("click", closeTradeDetail);
