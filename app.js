@@ -1374,7 +1374,7 @@ let scTrimStart = 0;
 let scTrimEnd = 0;
 let scSound = 70;
 let scFormat = {
-  show: "amount", style: "line", stats: "boxed",
+  show: "amount", style: "plain", stats: "plain",
   pnlBorder: "border", corners: "rounded", size: "square", quality: "standard",
 };
 let scRafId = null;
@@ -1455,14 +1455,17 @@ function getScCardData() {
 
   if (scPeriod === "trade" && scTrade) {
     const t = scTrade;
+    const dirWord = t.position === "Buy" ? "LONG" : (t.position === "Sell" ? "SHORT" : "");
     return {
       isBacktest,
       title: t.pair || "-",
-      subtitle: `${t.position || "-"} · ${t.date || "-"}`,
+      tag: [dirWord, scFmtDateTag(t.date)].filter(Boolean).join(" · "),
+      direction: t.position === "Sell" ? -1 : 1,
+      accountName: account?.name || "",
       pnl: t.pnl || 0,
       pct: account?.startingBalance ? ((t.pnl || 0) / account.startingBalance) * 100 : null,
       stats: [
-        { label: "Direction", value: t.position || "-" },
+        { label: "Risk", value: isBacktest ? "1R" : (t.risk ? formatMoney(t.risk) : "-") },
         { label: "R:R", value: t.riskReward || "-" },
         { label: "Result", value: t.result || "-" },
       ],
@@ -1479,7 +1482,9 @@ function getScCardData() {
   return {
     isBacktest,
     title: account?.name || "Jurnal Trading",
-    subtitle: periodLabel,
+    tag: periodLabel.toUpperCase(),
+    direction: pnl >= 0 ? 1 : -1,
+    accountName: "",
     pnl,
     pct: account?.startingBalance ? (pnl / account.startingBalance) * 100 : null,
     stats: [
@@ -1559,80 +1564,229 @@ function scDrawStatsRow(ctx, x, y, w, h, stats, s) {
   ctx.textAlign = "left";
 }
 
-function scDrawCardContent(ctx, w, h, s) {
-  const data = getScCardData();
+// ---- Layout per ukuran: tiap size punya komposisi sendiri ----
+// align "left"  : ticker, P&L, stats rata kiri, chart (kalau aktif) di kanan
+// align "center": semua rata tengah, posisi vertikal beda tiap ukuran
+const SC_LAYOUTS = {
+  landscape: { align: "left",   tickerY: 0.15, pnlY: 0.42, statsY: 0.53, footY: 0.89, pnlFrac: 0.36 },
+  "16:9":    { align: "left",   tickerY: 0.18, pnlY: 0.42, statsY: 0.52, footY: 0.87, pnlFrac: 0.34 },
+  portrait:  { align: "center", tickerY: 0.12, pnlY: 0.63, statsY: 0.69, footY: 0.92, pnlFrac: 0.66 },
+  square:    { align: "center", tickerY: 0.15, pnlY: 0.69, statsY: 0.75, footY: 0.93, pnlFrac: 0.50 },
+  "4:5":     { align: "center", tickerY: 0.30, pnlY: 0.66, statsY: 0.72, footY: 0.92, pnlFrac: 0.54 },
+};
 
-  // ---- top info pill ----
-  ctx.textBaseline = "top";
-  ctx.font = `700 ${15 * s}px Inter, sans-serif`;
-  const titleW = ctx.measureText(data.title).width;
-  ctx.font = `500 ${11 * s}px 'JetBrains Mono', monospace`;
-  const subtitleW = ctx.measureText(data.subtitle).width;
-  const pillPadX = 14 * s;
-  const pillW = Math.max(titleW, subtitleW) + pillPadX * 2;
-  const pillH = 46 * s;
-  const pillX = 26 * s, pillY = 24 * s;
+const SC_MONTHS = ["JAN", "FEB", "MAR", "APR", "MEI", "JUN", "JUL", "AGU", "SEP", "OKT", "NOV", "DES"];
 
-  ctx.fillStyle = "rgba(0,0,0,0.45)";
-  scRoundRectPath(ctx, pillX, pillY, pillW, pillH, 10 * s);
+function scFmtDateTag(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr + "T00:00:00");
+  if (isNaN(d.getTime())) return "";
+  return `${SC_MONTHS[d.getMonth()]} ${d.getDate()}`;
+}
+
+function scTruncate(ctx, text, maxW) {
+  let t = String(text);
+  if (ctx.measureText(t).width <= maxW) return t;
+  while (t.length > 1 && ctx.measureText(t + "…").width > maxW) t = t.slice(0, -1);
+  return t + "…";
+}
+
+function scFitPnlFont(ctx, text, targetW, maxW) {
+  ctx.font = `800 100px Manrope, sans-serif`;
+  const wAt100 = ctx.measureText(text).width || 1;
+  const byTarget = (targetW / wAt100) * 100;
+  const byMax = (maxW / wAt100) * 100;
+  return Math.min(byTarget, byMax);
+}
+
+function scDrawTicker(ctx, data, s, x, cy, align, maxW) {
+  const r = 15 * s;
+  ctx.textBaseline = "middle";
+  ctx.font = `800 ${26 * s}px Manrope, sans-serif`;
+  const tagText = data.tag || "";
+  ctx.font = `700 ${12 * s}px Inter, sans-serif`;
+  const tagW = tagText ? ctx.measureText(tagText).width : 0;
+  const gap1 = 10 * s;
+  const gap2 = tagText ? 10 * s : 0;
+  ctx.font = `800 ${26 * s}px Manrope, sans-serif`;
+  const title = scTruncate(ctx, data.title, Math.max(60 * s, maxW - (r * 2 + gap1 + gap2 + tagW)));
+  const titleW = ctx.measureText(title).width;
+
+  const total = r * 2 + gap1 + titleW + gap2 + tagW;
+  const startX = align === "center" ? x - total / 2 : x;
+  const icx = startX + r;
+
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.arc(icx, cy, r, 0, Math.PI * 2);
   ctx.fill();
 
+  const f = data.direction >= 0 ? 1 : -1;
+  ctx.strokeStyle = "#000000";
+  ctx.lineWidth = 2 * s;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  ctx.moveTo(icx - 7 * s, cy + 4 * s * f);
+  ctx.lineTo(icx - 1.8 * s, cy - 1.8 * s * f);
+  ctx.lineTo(icx + 1.8 * s, cy + 1.8 * s * f);
+  ctx.lineTo(icx + 7 * s, cy - 4 * s * f);
+  ctx.stroke();
+
+  ctx.textAlign = "left";
   ctx.fillStyle = "#ffffff";
-  ctx.font = `700 ${15 * s}px Inter, sans-serif`;
-  ctx.fillText(data.title, pillX + pillPadX, pillY + 7 * s);
-  ctx.fillStyle = "rgba(255,255,255,0.6)";
-  ctx.font = `500 ${11 * s}px 'JetBrains Mono', monospace`;
-  ctx.fillText(data.subtitle, pillX + pillPadX, pillY + 25 * s);
-
-  // ---- bottom stats block ----
-  const blockPad = 30 * s;
-  const blockW = w - blockPad * 2;
-  const bottomMargin = 28 * s;
-
-  const statsH = scFormat.stats === "boxed" ? 58 * s : 32 * s;
-  const statsY = h - bottomMargin - statsH;
-
-  const pnlH = 78 * s;
-  const pnlBottom = statsY - 14 * s;
-  const pnlTop = pnlBottom - pnlH;
-
-  let sparkH = 0, sparkY = pnlTop;
-  if (scFormat.style === "line") {
-    sparkH = 60 * s;
-    sparkY = pnlTop - 14 * s - sparkH;
+  ctx.font = `800 ${26 * s}px Manrope, sans-serif`;
+  const textX = startX + r * 2 + gap1;
+  ctx.fillText(title, textX, cy);
+  if (tagText) {
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.font = `700 ${12 * s}px Inter, sans-serif`;
+    ctx.fillText(tagText, textX + titleW + gap2, cy + 1 * s);
   }
+}
 
-  const blockTop = (scFormat.style === "line" ? sparkY : pnlTop) - 22 * s;
-  const blockBottom = statsY + statsH + 18 * s;
-
+function scDrawPnlText(ctx, text, x, y, px, align) {
+  const qs = scFormat.quality === "high" ? 2 : 1;
+  ctx.textAlign = align;
+  ctx.textBaseline = "alphabetic";
+  ctx.font = `800 ${px}px Manrope, sans-serif`;
+  ctx.fillStyle = "#ffffff";
   if (scFormat.pnlBorder === "border") {
-    ctx.strokeStyle = "rgba(255,255,255,0.22)";
-    ctx.lineWidth = 1.4 * s;
-    ctx.fillStyle = "rgba(0,0,0,0.22)";
-    const r = scFormat.corners === "rounded" ? 16 * s : 0;
-    scRoundRectPath(ctx, blockPad - 14 * s, blockTop, blockW + 28 * s, blockBottom - blockTop, r);
-    ctx.fill();
-    ctx.stroke();
+    ctx.save();
+    ctx.shadowColor = "rgba(255,255,255,0.7)";
+    ctx.shadowBlur = px * 0.3 * qs;
+    ctx.fillText(text, x, y);
+    ctx.restore();
+    ctx.save();
+    ctx.shadowColor = "rgba(255,255,255,0.35)";
+    ctx.shadowBlur = px * 0.1 * qs;
+    ctx.fillText(text, x, y);
+    ctx.restore();
+  } else {
+    ctx.fillText(text, x, y);
   }
+  ctx.textAlign = "left";
+}
 
-  if (scFormat.style === "line") {
-    scDrawSparkline(ctx, blockPad, sparkY, blockW, sparkH, data.sparkSeries, s);
-  }
-
-  ctx.textAlign = "center";
+function scDrawStatsRows(ctx, anchorX, topY, stats, s, align) {
+  const rowH = 31 * s;
+  const labelX = align === "center" ? anchorX - 96 * s : anchorX;
+  const valueX = align === "center" ? anchorX + 44 * s : anchorX + 96 * s;
+  ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
-  ctx.font = `800 ${58 * s}px Manrope, sans-serif`;
+  stats.forEach((item, i) => {
+    const y = topY + 16 * s + i * rowH;
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    ctx.font = `600 ${14 * s}px Inter, sans-serif`;
+    ctx.fillText(String(item.label), labelX, y);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `700 ${15 * s}px Inter, sans-serif`;
+    ctx.fillText(scTruncate(ctx, item.value, 110 * s), valueX, y);
+  });
+}
+
+function scDrawFooter(ctx, data, w, h, s, L, padX) {
+  const y = L.footY * h;
+  const iconR = 9 * s;
+  const gap = 8 * s;
+  const left = L.align === "left";
+
+  ctx.textBaseline = "middle";
+  ctx.font = `800 ${14.5 * s}px Manrope, sans-serif`;
+  const brand = "Jurnal Trading";
+  const brandW = ctx.measureText(brand).width;
+  ctx.font = `600 ${14.5 * s}px Manrope, sans-serif`;
+  const account = data.accountName || "";
+  const sep = account ? " × " : "";
+  const sepW = account ? ctx.measureText(sep).width : 0;
+  const accText = account ? scTruncate(ctx, account, 150 * s) : "";
+  const accW = accText ? ctx.measureText(accText).width : 0;
+
+  const total = iconR * 2 + gap + brandW + sepW + accW;
+  const startX = left ? padX : w / 2 - total / 2;
+
   ctx.fillStyle = "#ffffff";
-  ctx.fillText(scFormatValue(data), w / 2, pnlBottom - 6 * s);
-  ctx.textAlign = "left";
+  ctx.beginPath();
+  ctx.arc(startX + iconR, y, iconR, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#000000";
+  ctx.textAlign = "center";
+  ctx.font = `italic 800 ${12 * s}px Georgia, serif`;
+  ctx.fillText("J", startX + iconR, y + 0.5 * s);
 
-  scDrawStatsRow(ctx, blockPad, statsY, blockW, statsH, data.stats, s);
-
   ctx.textAlign = "left";
-  ctx.textBaseline = "alphabetic";
-  ctx.font = `700 ${12 * s}px Manrope, sans-serif`;
-  ctx.fillStyle = "rgba(255,255,255,0.7)";
-  ctx.fillText("Jurnal Trading", blockPad, h - 10 * s);
+  let tx = startX + iconR * 2 + gap;
+  ctx.fillStyle = "#ffffff";
+  ctx.font = `800 ${14.5 * s}px Manrope, sans-serif`;
+  ctx.fillText(brand, tx, y);
+  tx += brandW;
+  if (accText) {
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.font = `600 ${14.5 * s}px Manrope, sans-serif`;
+    ctx.fillText(sep + accText, tx, y);
+  }
+
+  const host = (window.location && window.location.host) || "";
+  if (host) {
+    ctx.fillStyle = "rgba(255,255,255,0.42)";
+    ctx.font = `500 ${11.5 * s}px Inter, sans-serif`;
+    if (left) {
+      ctx.textAlign = "right";
+      ctx.fillText(host, w - padX, y);
+    } else {
+      ctx.textAlign = "center";
+      ctx.fillText(host, w / 2, y + 20 * s);
+    }
+  }
+  ctx.textAlign = "left";
+}
+
+function scDrawCardContent(ctx, w, h, s) {
+  const data = getScCardData();
+  const L = SC_LAYOUTS[scFormat.size] || SC_LAYOUTS.square;
+  const left = L.align === "left";
+  const padX = (left ? 0.075 : 0.07) * w;
+  const anchorX = left ? padX : w / 2;
+  const sparkOn = scFormat.style === "line";
+
+  // ---- ticker ----
+  scDrawTicker(ctx, data, s, anchorX, L.tickerY * h, left ? "left" : "center", w - padX * 2);
+
+  // ---- P&L (ukuran font nyesuaiin lebar target tiap layout) ----
+  const pnlText = scFormatValue(data);
+  const maxPnlW = left && sparkOn ? w * 0.5 - padX : w - padX * 2;
+  const pnlPx = Math.min(scFitPnlFont(ctx, pnlText, L.pnlFrac * w, maxPnlW), 120 * s);
+  const baseline = L.pnlY * h;
+  scDrawPnlText(ctx, pnlText, anchorX, baseline, pnlPx, left ? "left" : "center");
+
+  // ---- sparkline (opsional: Style = Line on top) ----
+  if (sparkOn) {
+    if (left) {
+      const sx = w * 0.56;
+      scDrawSparkline(ctx, sx, h * 0.27, w - padX - sx, h * 0.32, data.sparkSeries, s);
+    } else {
+      const pnlTop = baseline - pnlPx * 0.74;
+      const minTop = L.tickerY * h + 36 * s;
+      const sparkH = Math.min(90 * s, pnlTop - 22 * s - minTop);
+      if (sparkH > 28 * s) {
+        scDrawSparkline(ctx, padX, pnlTop - 22 * s - sparkH, w - padX * 2, sparkH, data.sparkSeries, s);
+      }
+    }
+  }
+
+  // ---- stats ----
+  const statsTop = L.statsY * h;
+  if (scFormat.stats === "boxed") {
+    const boxH = 52 * s;
+    const bw = left ? Math.min(w - padX * 2, sparkOn ? w * 0.5 - padX : 420 * s) : Math.min(w - padX * 2, 520 * s);
+    const bx = left ? padX : w / 2 - bw / 2;
+    scDrawStatsRow(ctx, bx, statsTop, bw, boxH, data.stats, s);
+  } else {
+    scDrawStatsRows(ctx, anchorX, statsTop, data.stats, s, left ? "left" : "center");
+  }
+
+  // ---- footer ----
+  scDrawFooter(ctx, data, w, h, s, L, padX);
 }
 
 function drawScCard() {
