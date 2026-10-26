@@ -1600,48 +1600,25 @@ function scFitPnlFont(ctx, text, targetW, maxW) {
 }
 
 function scDrawTicker(ctx, data, s, x, cy, align, maxW) {
-  const r = 15 * s;
   ctx.textBaseline = "middle";
-  ctx.font = `800 ${26 * s}px Manrope, sans-serif`;
   const tagText = data.tag || "";
   ctx.font = `700 ${12 * s}px Inter, sans-serif`;
   const tagW = tagText ? ctx.measureText(tagText).width : 0;
-  const gap1 = 10 * s;
-  const gap2 = tagText ? 10 * s : 0;
+  const gap = tagText ? 10 * s : 0;
   ctx.font = `800 ${26 * s}px Manrope, sans-serif`;
-  const title = scTruncate(ctx, data.title, Math.max(60 * s, maxW - (r * 2 + gap1 + gap2 + tagW)));
+  const title = scTruncate(ctx, data.title, Math.max(60 * s, maxW - gap - tagW));
   const titleW = ctx.measureText(title).width;
 
-  const total = r * 2 + gap1 + titleW + gap2 + tagW;
+  const total = titleW + gap + tagW;
   const startX = align === "center" ? x - total / 2 : x;
-  const icx = startX + r;
-
-  ctx.fillStyle = "#ffffff";
-  ctx.beginPath();
-  ctx.arc(icx, cy, r, 0, Math.PI * 2);
-  ctx.fill();
-
-  const f = data.direction >= 0 ? 1 : -1;
-  ctx.strokeStyle = "#000000";
-  ctx.lineWidth = 2 * s;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.beginPath();
-  ctx.moveTo(icx - 7 * s, cy + 4 * s * f);
-  ctx.lineTo(icx - 1.8 * s, cy - 1.8 * s * f);
-  ctx.lineTo(icx + 1.8 * s, cy + 1.8 * s * f);
-  ctx.lineTo(icx + 7 * s, cy - 4 * s * f);
-  ctx.stroke();
 
   ctx.textAlign = "left";
   ctx.fillStyle = "#ffffff";
-  ctx.font = `800 ${26 * s}px Manrope, sans-serif`;
-  const textX = startX + r * 2 + gap1;
-  ctx.fillText(title, textX, cy);
+  ctx.fillText(title, startX, cy);
   if (tagText) {
     ctx.fillStyle = "rgba(255,255,255,0.55)";
     ctx.font = `700 ${12 * s}px Inter, sans-serif`;
-    ctx.fillText(tagText, textX + titleW + gap2, cy + 1 * s);
+    ctx.fillText(tagText, startX + titleW + gap, cy + 1 * s);
   }
 }
 
@@ -1687,57 +1664,13 @@ function scDrawStatsRows(ctx, anchorX, topY, stats, s, align) {
 
 function scDrawFooter(ctx, data, w, h, s, L, padX) {
   const y = L.footY * h;
-  const iconR = 9 * s;
-  const gap = 8 * s;
   const left = L.align === "left";
-
+  const label = { trade: "Trade Recap", day: "Daily Recap", week: "Weekly Recap", month: "Monthly Recap" }[scPeriod] || "Trade Recap";
   ctx.textBaseline = "middle";
-  ctx.font = `800 ${14.5 * s}px Manrope, sans-serif`;
-  const brand = "Jurnal Trading";
-  const brandW = ctx.measureText(brand).width;
-  ctx.font = `600 ${14.5 * s}px Manrope, sans-serif`;
-  const account = data.accountName || "";
-  const sep = account ? " × " : "";
-  const sepW = account ? ctx.measureText(sep).width : 0;
-  const accText = account ? scTruncate(ctx, account, 150 * s) : "";
-  const accW = accText ? ctx.measureText(accText).width : 0;
-
-  const total = iconR * 2 + gap + brandW + sepW + accW;
-  const startX = left ? padX : w / 2 - total / 2;
-
-  ctx.fillStyle = "#ffffff";
-  ctx.beginPath();
-  ctx.arc(startX + iconR, y, iconR, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#000000";
-  ctx.textAlign = "center";
-  ctx.font = `italic 800 ${12 * s}px Georgia, serif`;
-  ctx.fillText("J", startX + iconR, y + 0.5 * s);
-
-  ctx.textAlign = "left";
-  let tx = startX + iconR * 2 + gap;
-  ctx.fillStyle = "#ffffff";
-  ctx.font = `800 ${14.5 * s}px Manrope, sans-serif`;
-  ctx.fillText(brand, tx, y);
-  tx += brandW;
-  if (accText) {
-    ctx.fillStyle = "rgba(255,255,255,0.6)";
-    ctx.font = `600 ${14.5 * s}px Manrope, sans-serif`;
-    ctx.fillText(sep + accText, tx, y);
-  }
-
-  const host = (window.location && window.location.host) || "";
-  if (host) {
-    ctx.fillStyle = "rgba(255,255,255,0.42)";
-    ctx.font = `500 ${11.5 * s}px Inter, sans-serif`;
-    if (left) {
-      ctx.textAlign = "right";
-      ctx.fillText(host, w - padX, y);
-    } else {
-      ctx.textAlign = "center";
-      ctx.fillText(host, w / 2, y + 20 * s);
-    }
-  }
+  ctx.textAlign = left ? "left" : "center";
+  ctx.fillStyle = "rgba(255,255,255,0.75)";
+  ctx.font = `700 ${14.5 * s}px Manrope, sans-serif`;
+  ctx.fillText(label, left ? padX : w / 2, y);
   ctx.textAlign = "left";
 }
 
