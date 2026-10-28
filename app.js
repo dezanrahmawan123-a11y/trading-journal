@@ -230,11 +230,18 @@ adminApprovalBtn.addEventListener("click", () => {
   adminModalOverlay.classList.remove("hidden");
 
   if (unsubscribeAdminRequests) unsubscribeAdminRequests();
+  adminRequestsList.innerHTML = `<div class="admin-request-empty">Lagi ngambil data...</div>`;
   unsubscribeAdminRequests = onSnapshot(
-    query(collection(db, "access_requests"), orderBy("requestedAt", "desc")),
+    collection(db, "access_requests"),
     (snapshot) => {
       const allReq = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      const ts = (r) => (r.requestedAt?.toMillis ? r.requestedAt.toMillis() : 0);
+      allReq.sort((a, b) => ts(b) - ts(a));
       renderAdminRequests(allReq);
+    },
+    (err) => {
+      console.error(err);
+      adminRequestsList.innerHTML = `<div class="admin-request-empty">Gagal ambil daftar user (${escapeHtml(err.code || "error")}). Cek Firestore Rules: collection <b>access_requests</b> harus boleh dibaca oleh akun admin.</div>`;
     }
   );
 });
@@ -257,7 +264,9 @@ function renderAdminRequests(allReq) {
     const dateStr = r.requestedAt?.toDate ? r.requestedAt.toDate().toLocaleString("id-ID") : "-";
     const statusBadge = r.approved
       ? `<span class="result-badge result-profit">Approved</span>`
-      : `<span class="result-badge result-breakeven">Pending</span>`;
+      : (r.rejected
+        ? `<span class="result-badge result-loss">Ditolak</span>`
+        : `<span class="result-badge result-breakeven">Pending</span>`);
     return `
       <div class="admin-request-item">
         <div>
@@ -267,7 +276,7 @@ function renderAdminRequests(allReq) {
         <div class="admin-request-actions">
           ${statusBadge}
           ${!r.approved ? `<button class="btn-edit" data-action="approve" data-id="${r.id}">Approve</button>` : ""}
-          <button class="btn-danger" data-action="reject" data-id="${r.id}">Tolak</button>
+          ${!r.rejected ? `<button class="btn-danger" data-action="reject" data-id="${r.id}">Tolak</button>` : ""}
         </div>
       </div>
     `;
@@ -275,13 +284,13 @@ function renderAdminRequests(allReq) {
 
   adminRequestsList.querySelectorAll("[data-action='approve']").forEach(btn => {
     btn.addEventListener("click", async () => {
-      await updateDoc(doc(db, "access_requests", btn.dataset.id), { approved: true });
+      await updateDoc(doc(db, "access_requests", btn.dataset.id), { approved: true, rejected: false });
     });
   });
   adminRequestsList.querySelectorAll("[data-action='reject']").forEach(btn => {
     btn.addEventListener("click", async () => {
       if (confirm("Tolak user ini? Mereka gak akan bisa masuk lagi (akun login-nya tetap ada tapi terkunci).")) {
-        await deleteDoc(doc(db, "access_requests", btn.dataset.id));
+        await updateDoc(doc(db, "access_requests", btn.dataset.id), { approved: false, rejected: true });
       }
     });
   });
@@ -309,6 +318,14 @@ onAuthStateChanged(auth, (user) => {
       adminApprovalBtn.classList.add("hidden");
       unsubscribeAccessRequest = onSnapshot(doc(db, "access_requests", user.uid), (snap) => {
         const approved = snap.exists() && snap.data().approved === true;
+        if (!snap.exists()) {
+          // Pendaftaran sebelumnya gagal nulis ke Firestore -> bikin ulang biar muncul di daftar admin
+          setDoc(doc(db, "access_requests", user.uid), {
+            email: user.email,
+            approved: false,
+            requestedAt: serverTimestamp(),
+          }).catch((e) => console.error("Gagal bikin access request:", e));
+        }
         if (approved) {
           pendingShell.classList.add("hidden");
           appShell.classList.remove("hidden");
