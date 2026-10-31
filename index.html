@@ -110,12 +110,6 @@
           </span>
           <span class="tab-label">Analytics</span>
         </button>
-        <button class="tab-btn" data-tab="study">
-          <span class="tab-icon">
-            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6.5 12 3l9 3.5-9 3.5-9-3.5Z" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 9.5V16c0 1.2 2.2 3 5 3s5-1.8 5-3V9.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 7.5V14" stroke-linecap="round"/></svg>
-          </span>
-          <span class="tab-label">Study</span>
-        </button>
       </nav>
 
       <!-- ===== Profile shortcut (kanan atas) ===== -->
@@ -613,21 +607,6 @@
         </div>
       </section>
 
-      <!-- ============ STUDY TAB ============ -->
-      <section id="tab-study" class="tab-content hidden">
-        <div class="tradelog-header">
-          <h2>Study</h2>
-          <button type="button" class="btn btn-toggle-form hidden" id="study-add-btn">+ Tambah Materi</button>
-        </div>
-        <p class="panel-sub" style="margin:-10px 0 20px;">Materi belajar dari admin — PDF, video, atau link bacaan.</p>
-
-        <div id="study-grid" class="study-grid"></div>
-        <div id="study-empty-state" class="empty-state hidden">
-          <div class="big">🎓</div>
-          <div>Belum ada materi study. <span id="study-empty-admin-hint" class="hidden">Klik "+ Tambah Materi" buat mulai nambahin.</span></div>
-        </div>
-      </section>
-
     </main>
   </div>
 
@@ -702,45 +681,6 @@
           <button type="button" class="btn btn-ghost hidden" id="news-delete-btn">Hapus</button>
           <button type="button" class="btn btn-ghost" id="news-cancel-btn">Batal</button>
           <button type="submit" class="btn btn-primary" id="news-save-btn">Simpan</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- ===================== MODAL TAMBAH MATERI STUDY (admin) ===================== -->
-  <div id="study-modal-overlay" class="modal-overlay hidden">
-    <div class="modal">
-      <h2 id="study-modal-title">Tambah Materi</h2>
-      <p class="modal-desc">Materi ini bakal muncul buat semua user di tab Study.</p>
-      <div id="study-modal-error" class="error-msg hidden"></div>
-      <form id="study-form">
-        <input type="hidden" id="study-id" />
-        <div class="field full">
-          <label>Tipe</label>
-          <div class="pill-group" id="study-type-group" data-mode="single">
-            <button type="button" class="pill" data-value="pdf">📄 PDF</button>
-            <button type="button" class="pill" data-value="video">🎥 Video</button>
-            <button type="button" class="pill" data-value="link">🔗 Link</button>
-          </div>
-        </div>
-        <div class="field">
-          <label>Judul *</label>
-          <input type="text" id="study-title" required placeholder="Contoh: Dasar Risk Management" />
-        </div>
-
-        <div class="field full">
-          <label id="study-url-label">Link / URL *</label>
-          <input type="text" id="study-url" required placeholder="https://..." />
-        </div>
-
-        <div class="field full">
-          <label>Deskripsi (opsional)</label>
-          <textarea id="study-description" rows="2" placeholder="Ringkasan singkat materinya..."></textarea>
-        </div>
-        <div class="modal-actions">
-          <button type="button" class="btn btn-ghost hidden" id="study-delete-btn">Hapus</button>
-          <button type="button" class="btn btn-ghost" id="study-cancel-btn">Batal</button>
-          <button type="submit" class="btn btn-primary" id="study-save-btn">Simpan</button>
         </div>
       </form>
     </div>

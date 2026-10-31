@@ -40,8 +40,6 @@ let unsubscribeAccessRequest = null;
 let unsubscribeAdminRequests = null;
 let unsubscribeNews = null;
 let allNews = [];
-let unsubscribeStudy = null;
-let allStudy = [];
 let isAdminUser = false;
 let calendarViewDate = new Date();
 let isFirstAccountFlow = false;
@@ -70,7 +68,6 @@ const tabContents = {
   dashboard: document.getElementById("tab-dashboard"),
   tradelog: document.getElementById("tab-tradelog"),
   analytics: document.getElementById("tab-analytics"),
-  study: document.getElementById("tab-study"),
 };
 
 // ---------- DOM refs: trade log ----------
@@ -303,8 +300,6 @@ onAuthStateChanged(auth, (user) => {
     userEmailEl.textContent = user.email;
 
     isAdminUser = user.uid === ADMIN_UID;
-    studyAddBtn.classList.toggle("hidden", !isAdminUser);
-    studyEmptyAdminHint.classList.toggle("hidden", !isAdminUser);
 
     if (user.uid === ADMIN_UID) {
       pendingShell.classList.add("hidden");
@@ -313,7 +308,6 @@ onAuthStateChanged(auth, (user) => {
       subscribeToAccounts(user.uid);
       subscribeToTrades(user.uid);
       subscribeToNews(user.uid);
-      subscribeToStudy();
     } else {
       adminApprovalBtn.classList.add("hidden");
       unsubscribeAccessRequest = onSnapshot(doc(db, "access_requests", user.uid), (snap) => {
@@ -332,7 +326,6 @@ onAuthStateChanged(auth, (user) => {
           subscribeToAccounts(user.uid);
           subscribeToTrades(user.uid);
           subscribeToNews(user.uid);
-          subscribeToStudy();
         } else {
           appShell.classList.add("hidden");
           pendingShell.classList.remove("hidden");
@@ -348,10 +341,8 @@ onAuthStateChanged(auth, (user) => {
     if (unsubscribeAccessRequest) unsubscribeAccessRequest();
     if (unsubscribeAdminRequests) unsubscribeAdminRequests();
     if (unsubscribeNews) unsubscribeNews();
-    if (unsubscribeStudy) unsubscribeStudy();
     allTrades = [];
     allAccounts = [];
-    allStudy = [];
     currentAccountId = null;
     isAdminUser = false;
   }
@@ -657,171 +648,6 @@ function getFilteredNews() {
   if (level === "high") return allNews.filter(n => n.impact === "high");
   if (level === "medium") return allNews.filter(n => n.impact === "medium" || n.impact === "high");
   return allNews;
-}
-
-// ============================================================
-// FIRESTORE: STUDY (materi belajar - global, cuma admin yang bisa nulis)
-// ============================================================
-
-function studyCollection() {
-  return collection(db, "study_materials");
-}
-
-function subscribeToStudy() {
-  const q = query(studyCollection(), orderBy("createdAt", "desc"));
-  unsubscribeStudy = onSnapshot(q, (snapshot) => {
-    allStudy = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderStudy();
-  }, (err) => console.error(err));
-}
-
-async function saveStudy(data, studyId) {
-  if (studyId) {
-    await updateDoc(doc(db, "study_materials", studyId), data);
-  } else {
-    await addDoc(studyCollection(), { ...data, createdAt: serverTimestamp() });
-  }
-}
-
-async function removeStudy(studyId) {
-  await deleteDoc(doc(db, "study_materials", studyId));
-}
-
-const studyGrid = document.getElementById("study-grid");
-const studyEmptyState = document.getElementById("study-empty-state");
-const studyEmptyAdminHint = document.getElementById("study-empty-admin-hint");
-const studyAddBtn = document.getElementById("study-add-btn");
-const studyModalOverlay = document.getElementById("study-modal-overlay");
-const studyModalTitle = document.getElementById("study-modal-title");
-const studyModalError = document.getElementById("study-modal-error");
-const studyForm = document.getElementById("study-form");
-const studyUrlLabel = document.getElementById("study-url-label");
-const studyCancelBtn = document.getElementById("study-cancel-btn");
-const studyDeleteBtn = document.getElementById("study-delete-btn");
-
-const STUDY_TYPE_LABEL = { pdf: "📄 PDF", video: "🎥 Video", link: "🔗 Link" };
-const STUDY_URL_LABEL = { pdf: "Link PDF *", video: "Link Video *", link: "Link / URL *" };
-const STUDY_URL_PLACEHOLDER = {
-  pdf: "https://drive.google.com/... atau link PDF lainnya",
-  video: "https://youtube.com/... atau link video lainnya",
-  link: "https://...",
-};
-
-function getYouTubeId(url) {
-  if (!url) return null;
-  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-  return m ? m[1] : null;
-}
-
-function getStudyType() {
-  const typePill = document.querySelector("#study-type-group .pill.active");
-  return typePill ? typePill.dataset.value : "pdf";
-}
-
-function refreshStudyUrlLabel() {
-  const type = getStudyType();
-  studyUrlLabel.textContent = STUDY_URL_LABEL[type] || STUDY_URL_LABEL.link;
-  document.getElementById("study-url").placeholder = STUDY_URL_PLACEHOLDER[type] || STUDY_URL_PLACEHOLDER.link;
-}
-
-document.querySelectorAll("#study-type-group .pill").forEach(p => p.addEventListener("click", refreshStudyUrlLabel));
-
-function openStudyModal(item = null) {
-  studyForm.reset();
-  studyModalError.classList.add("hidden");
-  document.getElementById("study-id").value = item?.id || "";
-  document.getElementById("study-title").value = item?.title || "";
-  document.getElementById("study-url").value = item?.url || "";
-  document.getElementById("study-description").value = item?.description || "";
-  document.querySelectorAll("#study-type-group .pill").forEach(p => p.classList.remove("active"));
-  const typePill = document.querySelector(`#study-type-group .pill[data-value="${item?.type || "pdf"}"]`);
-  if (typePill) typePill.classList.add("active");
-  studyModalTitle.textContent = item ? "Edit Materi" : "Tambah Materi";
-  studyDeleteBtn.classList.toggle("hidden", !item);
-  refreshStudyUrlLabel();
-  studyModalOverlay.classList.remove("hidden");
-}
-
-function closeStudyModal() {
-  studyModalOverlay.classList.add("hidden");
-}
-
-studyAddBtn.addEventListener("click", () => openStudyModal());
-studyCancelBtn.addEventListener("click", closeStudyModal);
-studyModalOverlay.addEventListener("click", (e) => { if (e.target === studyModalOverlay) closeStudyModal(); });
-
-studyForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  studyModalError.classList.add("hidden");
-
-  const studyId = document.getElementById("study-id").value || null;
-  const title = document.getElementById("study-title").value.trim();
-  const url = document.getElementById("study-url").value.trim();
-  const description = document.getElementById("study-description").value.trim();
-  const type = getStudyType();
-
-  if (!title || !url) {
-    studyModalError.textContent = "Isi judul dan link/URL materinya.";
-    studyModalError.classList.remove("hidden");
-    return;
-  }
-
-  try {
-    await saveStudy({ title, url, description, type }, studyId);
-    closeStudyModal();
-  } catch (err) {
-    studyModalError.textContent = "Gagal menyimpan. Coba lagi.";
-    studyModalError.classList.remove("hidden");
-    console.error(err);
-  }
-});
-
-studyDeleteBtn.addEventListener("click", async () => {
-  const studyId = document.getElementById("study-id").value;
-  if (studyId && confirm("Hapus materi ini?")) {
-    await removeStudy(studyId);
-    closeStudyModal();
-  }
-});
-
-function renderStudy() {
-  studyGrid.innerHTML = "";
-  studyEmptyState.classList.toggle("hidden", allStudy.length > 0);
-
-  allStudy.forEach(item => {
-    const card = document.createElement("div");
-    card.className = "study-card";
-
-    const ytId = item.type === "video" ? getYouTubeId(item.url) : null;
-    const isDirectVideoFile = item.type === "video" && !ytId && /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(item.url || "");
-    const openLabel = item.type === "pdf" ? "Buka PDF" : item.type === "video" ? "Buka Video" : "Buka Link";
-
-    card.innerHTML = `
-      <div class="study-card-top">
-        <span class="study-card-type">${STUDY_TYPE_LABEL[item.type] || "🔗 Link"}</span>
-        ${isAdminUser ? `
-          <div class="study-card-actions">
-            <button type="button" class="study-edit-btn" title="Edit">✎</button>
-            <button type="button" class="study-del-btn" title="Hapus">✕</button>
-          </div>
-        ` : ""}
-      </div>
-      <h4>${escapeHtml(item.title || "")}</h4>
-      ${item.description ? `<p>${escapeHtml(item.description)}</p>` : ""}
-      ${ytId ? `<div class="study-card-embed"><iframe src="https://www.youtube.com/embed/${ytId}" title="${escapeHtml(item.title || "")}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>` : ""}
-      ${isDirectVideoFile ? `<video class="study-card-video" src="${escapeHtml(item.url || "")}" controls preload="metadata"></video>` : ""}
-      <a class="study-card-open" href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener noreferrer">${ytId ? "Buka di YouTube" : openLabel} ↗</a>
-    `;
-
-    if (isAdminUser) {
-      card.querySelector(".study-edit-btn").addEventListener("click", () => openStudyModal(item));
-      card.querySelector(".study-del-btn").addEventListener("click", async () => {
-        if (confirm("Hapus materi ini?")) await removeStudy(item.id);
-      });
-    }
-
-    studyGrid.appendChild(card);
-  });
 }
 
 async function saveTrade(tradeData, tradeId) {
