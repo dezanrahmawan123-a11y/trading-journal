@@ -1649,7 +1649,7 @@ function scDrawStatsRows(ctx, anchorX, topY, stats, s, align) {
 function scDrawFooter(ctx, data, w, h, s, L, padX) {
   const y = L.footY * h;
   const left = L.align === "left";
-  const label = { trade: "Trade Recap", day: "Daily Recap", week: "Weekly Recap", month: "Monthly Recap" }[scPeriod] || "Trade Recap";
+  const label = { trade: "Trade Recap", day: "Daily Recap", week: "Weekly Recap", month: "Monthly Recap", year: "Yearly Recap" }[scPeriod] || "Trade Recap";
   ctx.textBaseline = "middle";
   ctx.textAlign = left ? "left" : "center";
   ctx.fillStyle = "rgba(255,255,255,0.75)";
@@ -1659,7 +1659,6 @@ function scDrawFooter(ctx, data, w, h, s, L, padX) {
 }
 
 // ---- Weekly recap (layout khusus tab Weekly) ----
-let scWeekOffset = 0;
 const SC_DAY_LABELS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
 function scMonthName(m) {
@@ -1686,26 +1685,72 @@ function scFmtUnit(v, unit) {
   return `${sign}${formatMoney(v)}`;
 }
 
+const SC_PERIOD_META = {
+  week:  { word: "day",   title: "DAILY RESULT",   net: "NET THIS WEEK",  sub: "Weekly recap" },
+  month: { word: "week",  title: "WEEKLY RESULT",  net: "NET THIS MONTH", sub: "Monthly recap" },
+  year:  { word: "month", title: "MONTHLY RESULT", net: "NET THIS YEAR",  sub: "Yearly recap" },
+};
+const scOffsets = { week: 0, month: 0, year: 0 };
+function scIsRecap() { return scPeriod === "week" || scPeriod === "month" || scPeriod === "year"; }
+
 function getScWeekData() {
+  const period = scIsRecap() ? scPeriod : "week";
+  const meta = SC_PERIOD_META[period];
+  const offset = scOffsets[period];
   const account = getCurrentAccount();
   const isBacktest = account?.type === "backtest";
   const startBal = account?.startingBalance || 0;
   const unit = (isBacktest || scFormat.show === "r") ? "r"
     : (scFormat.show === "percent" && startBal > 0 ? "pct" : "usd");
-
-  const base = new Date();
-  base.setDate(base.getDate() + scWeekOffset * 7);
-  const { monday } = getCurrentWeekRange(base);
   const trades = getAccountTrades();
+  const now = new Date();
+  const p2 = (n) => String(n).padStart(2, "0");
 
-  const buckets = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    buckets.push({ date: d, key: scLocalDateStr(d), pnl: 0, r: 0, count: 0, label: SC_DAY_LABELS[i] });
+  let buckets = [];
+  let range = "";
+  let matchBucket;
+
+  if (period === "week") {
+    const base = new Date();
+    base.setDate(base.getDate() + offset * 7);
+    const { monday } = getCurrentWeekRange(base);
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      buckets.push({ key: scLocalDateStr(d), pnl: 0, r: 0, count: 0, label: SC_DAY_LABELS[i],
+        dateLabel: `${scMonthName(d.getMonth())} ${d.getDate()}`, date: d });
+    }
+    matchBucket = (t) => buckets.find(x => x.key === t.date);
+  } else if (period === "month") {
+    const ref = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    const y = ref.getFullYear(), m = ref.getMonth();
+    const last = new Date(y, m + 1, 0).getDate();
+    const edges = [[1, 7], [8, 14], [15, 21], [22, last]];
+    edges.forEach(([a1, b1], i) => {
+      buckets.push({ from: a1, to: b1, pnl: 0, r: 0, count: 0, label: `WEEK ${i + 1}`,
+        dateLabel: `${scMonthName(m)} ${a1}–${b1}` });
+    });
+    const prefix = `${y}-${p2(m + 1)}-`;
+    matchBucket = (t) => {
+      if (!t.date || !t.date.startsWith(prefix)) return null;
+      const day = Number(t.date.slice(8, 10));
+      return buckets.find(x => day >= x.from && day <= x.to);
+    };
+    range = `${scMonthName(m)} ${y}`;
+  } else {
+    const y = now.getFullYear() + offset;
+    for (let i = 0; i < 12; i++) {
+      buckets.push({ month: i, pnl: 0, r: 0, count: 0, label: SC_MONTHS[i], dateLabel: "" });
+    }
+    matchBucket = (t) => {
+      if (!t.date || !t.date.startsWith(`${y}-`)) return null;
+      return buckets[Number(t.date.slice(5, 7)) - 1];
+    };
+    range = String(y);
   }
+
   trades.forEach(t => {
-    const b = buckets.find(x => x.key === t.date);
+    const b = matchBucket(t);
     if (!b) return;
     b.count++;
     b.pnl += t.pnl || 0;
@@ -1713,10 +1758,12 @@ function getScWeekData() {
     if (r !== null) b.r += r;
   });
 
-  const hasWeekend = buckets[5].count > 0 || buckets[6].count > 0;
-  const days = buckets.slice(0, hasWeekend ? 7 : 5).map(b => ({
+  if (period === "week") {
+    const hasWeekend = buckets[5].count > 0 || buckets[6].count > 0;
+    buckets = buckets.slice(0, hasWeekend ? 7 : 5);
+  }
+  const days = buckets.map(b => ({
     ...b,
-    dateLabel: `${scMonthName(b.date.getMonth())} ${b.date.getDate()}`,
     value: unit === "r" ? b.r : (unit === "pct" ? (b.pnl / startBal) * 100 : b.pnl),
   }));
 
@@ -1725,18 +1772,21 @@ function getScWeekData() {
   const green = traded.filter(x => x.value > 0).length;
   const avg = traded.length ? total / traded.length : 0;
   const best = traded.length ? Math.max(...traded.map(x => x.value)) : 0;
+  const tradeCount = days.reduce((s2, x) => s2 + x.count, 0);
   let cum = 0;
   const cumSeries = [0];
   days.forEach(x => { if (x.count > 0) { cum += x.value; cumSeries.push(cum); } });
 
-  const first = days[0].date, last = days[days.length - 1].date;
-  const range = first.getMonth() === last.getMonth()
-    ? `${scMonthName(first.getMonth())} ${first.getDate()}–${last.getDate()}`
-    : `${scMonthName(first.getMonth())} ${first.getDate()} – ${scMonthName(last.getMonth())} ${last.getDate()}`;
+  if (period === "week") {
+    const first = days[0].date, last = days[days.length - 1].date;
+    range = first.getMonth() === last.getMonth()
+      ? `${scMonthName(first.getMonth())} ${first.getDate()}–${last.getDate()}`
+      : `${scMonthName(first.getMonth())} ${first.getDate()} – ${scMonthName(last.getMonth())} ${last.getDate()}`;
+  }
 
   return {
-    unit, name: account?.name || "Jurnal Trading", days, sessions: traded.length,
-    green, total, avg, best, cumSeries, range,
+    unit, period, meta, name: account?.name || "Jurnal Trading", days, sessions: traded.length,
+    tradeCount, green, total, avg, best, cumSeries, range,
   };
 }
 
@@ -1809,7 +1859,7 @@ function scWkHeader(ctx, d, x, y, w) {
   ctx.fillText(scTruncate(ctx, d.name, w - 76 - pillW - 16), x + 76, y + 30);
   ctx.font = `600 20px Inter, sans-serif`;
   ctx.fillStyle = "rgba(255,255,255,0.6)";
-  ctx.fillText("Weekly recap", x + 76, y + 58);
+  ctx.fillText(d.meta.sub, x + 76, y + 58);
 }
 
 function scWkSegments(ctx, d, x, y, w) {
@@ -1833,7 +1883,7 @@ function scWkNet(ctx, d, x, y, w, maxPx) {
   ctx.fill();
   ctx.fillStyle = "rgba(255,255,255,0.7)";
   ctx.font = `800 20px Inter, sans-serif`;
-  ctx.fillText("NET THIS WEEK", x + 28, y + 19);
+  ctx.fillText(d.meta.net, x + 28, y + 19);
 
   const text = scFmtUnit(d.total, d.unit);
   const px = Math.min(scFitPnlFont(ctx, text, w * 0.92, w), maxPx);
@@ -1844,8 +1894,10 @@ function scWkNet(ctx, d, x, y, w, maxPx) {
 
 function scWkChips(ctx, d, x, y) {
   const chips = [
-    { text: `${d.green} green day${d.green === 1 ? "" : "s"}`, strong: true },
-    { text: `${d.sessions} session${d.sessions === 1 ? "" : "s"}`, strong: false },
+    { text: `${d.green} green ${d.meta.word}${d.green === 1 ? "" : "s"}`, strong: true },
+    d.period === "week"
+      ? { text: `${d.sessions} session${d.sessions === 1 ? "" : "s"}`, strong: false }
+      : { text: `${d.tradeCount} trade${d.tradeCount === 1 ? "" : "s"}`, strong: false },
   ];
   ctx.textBaseline = "alphabetic";
   ctx.textAlign = "left";
@@ -1864,9 +1916,9 @@ function scWkChips(ctx, d, x, y) {
 
 function scWkStatBoxes(ctx, d, x, y, w, h) {
   const items = [
-    { value: `${d.green} / ${d.sessions}`, label: "green days" },
-    { value: d.sessions ? scFmtUnit(d.avg, d.unit) : "–", label: "avg per day" },
-    { value: d.sessions ? scFmtUnit(d.best, d.unit) : "–", label: "best day" },
+    { value: `${d.green} / ${d.sessions}`, label: `green ${d.meta.word}s` },
+    { value: d.sessions ? scFmtUnit(d.avg, d.unit) : "–", label: `avg per ${d.meta.word}` },
+    { value: d.sessions ? scFmtUnit(d.best, d.unit) : "–", label: `best ${d.meta.word}` },
   ];
   const gap = 14;
   const bw = (w - gap * 2) / 3;
@@ -1891,7 +1943,7 @@ function scWkStatBoxes(ctx, d, x, y, w, h) {
 }
 
 function scWkDaily(ctx, d, x, y, w, rowH) {
-  const f = Math.max(0.7, Math.min(1, rowH / 62));
+  const f = Math.max(0.45, Math.min(1, rowH / 62));
   const headH = 56 * (f < 1 ? 1 : 1.1);
   const panelH = headH + d.days.length * rowH + 14;
   scPanel(ctx, x, y, w, panelH, 24);
@@ -1900,11 +1952,12 @@ function scWkDaily(ctx, d, x, y, w, rowH) {
   ctx.textBaseline = "alphabetic";
   ctx.fillStyle = "rgba(255,255,255,0.6)";
   ctx.font = `800 17px Inter, sans-serif`;
-  ctx.fillText("DAILY RESULT", x + 32, y + 36);
+  ctx.fillText(d.meta.title, x + 32, y + 36);
 
   const maxAbs = Math.max(1e-9, ...d.days.map(day => Math.abs(day.value)));
-  const trackX = x + 150 * f + 10;
-  const trackW = w - (150 * f + 10) - 130 * f - 28;
+  const labelCol = d.period === "week" ? 150 : (d.period === "month" ? 190 : 110);
+  const trackX = x + labelCol * f + 10;
+  const trackW = w - (labelCol * f + 10) - 130 * f - 28;
   const barH = 26 * f;
 
   d.days.forEach((day, i) => {
@@ -1913,10 +1966,14 @@ function scWkDaily(ctx, d, x, y, w, rowH) {
     ctx.textAlign = "left";
     ctx.fillStyle = "#ffffff";
     ctx.font = `800 ${24 * f}px Manrope, sans-serif`;
-    ctx.fillText(day.label, x + 32, midY - 2 * f);
-    ctx.fillStyle = "rgba(255,255,255,0.55)";
-    ctx.font = `600 ${16 * f}px Inter, sans-serif`;
-    ctx.fillText(day.dateLabel, x + 32, midY + 18 * f);
+    if (day.dateLabel) {
+      ctx.fillText(day.label, x + 32, midY - 2 * f);
+      ctx.fillStyle = "rgba(255,255,255,0.55)";
+      ctx.font = `600 ${16 * f}px Inter, sans-serif`;
+      ctx.fillText(day.dateLabel, x + 32, midY + 18 * f);
+    } else {
+      ctx.fillText(day.label, x + 32, midY + 8 * f);
+    }
 
     if (day.count > 0) {
       ctx.fillStyle = "rgba(255,255,255,0.14)";
@@ -2010,8 +2067,9 @@ function scDrawWeekRecap(ctx, w, h) {
   if (tall) {
     const W = 800, pad = 44, cw = W - pad * 2;
     const segY = 130, netY = 171, chipsY = 343, boxesY = 405, dailyY = 525;
-    const dailyH = 62 + n * 62 + 18;
-    const cumY = dailyY + dailyH + 22, cumH = 230;
+    const rowT = n > 7 ? 44 : 62;
+    const dailyH = 62 + n * rowT + 18;
+    const cumY = dailyY + dailyH + 22, cumH = n > 7 ? 200 : 230;
     const footY = cumY + cumH + 44;
     const Hc = footY + 36;
     const k = Math.min(w / W, h / Hc);
@@ -2023,7 +2081,7 @@ function scDrawWeekRecap(ctx, w, h) {
     scWkNet(ctx, d, pad, netY, cw, 124);
     scWkChips(ctx, d, pad, chipsY);
     scWkStatBoxes(ctx, d, pad, boxesY, cw, 96);
-    scWkDaily(ctx, d, pad, dailyY, cw, 62);
+    scWkDaily(ctx, d, pad, dailyY, cw, rowT);
     scWkCumulative(ctx, d, pad, cumY, cw, cumH);
     ctx.textAlign = "left";
     ctx.fillStyle = "rgba(255,255,255,0.6)";
@@ -2034,9 +2092,9 @@ function scDrawWeekRecap(ctx, w, h) {
   }
 
   const W = 1000, lx = 44, lw = 430, rx = 506, rw = 450;
-  const rowH = n <= 5 ? 48 : 40;
+  const rowH = n > 7 ? 30 : (n <= 5 ? 48 : 40);
   const dailyH = 56 + n * rowH + 14;
-  const cumY = 44 + dailyH + 18, cumH = 200;
+  const cumY = 44 + dailyH + 18, cumH = n > 7 ? 170 : 200;
   const rightBottom = cumY + cumH;
   const footY = Math.max(527, rightBottom - 10);
   const Hc = footY + 44;
@@ -2059,7 +2117,7 @@ function scDrawWeekRecap(ctx, w, h) {
 }
 
 function scDrawCardContent(ctx, w, h, s) {
-  if (scPeriod === "week") { scDrawWeekRecap(ctx, w, h); return; }
+  if (scIsRecap()) { scDrawWeekRecap(ctx, w, h); return; }
   const data = getScCardData();
   const L = SC_LAYOUTS[scFormat.size] || SC_LAYOUTS.square;
   const left = L.align === "left";
@@ -2525,18 +2583,20 @@ scExportGifBtn.addEventListener("click", scExportGif);
 function updateScWeekNav() {
   const nav = document.getElementById("sc-week-nav");
   if (!nav) return;
-  nav.classList.toggle("hidden", scPeriod !== "week");
-  if (scPeriod === "week") document.getElementById("sc-week-label").textContent = getScWeekData().range;
-  document.getElementById("sc-week-next").disabled = scWeekOffset >= 0;
+  const on = scIsRecap();
+  nav.classList.toggle("hidden", !on);
+  if (!on) return;
+  document.getElementById("sc-week-label").textContent = getScWeekData().range;
+  document.getElementById("sc-week-next").disabled = scOffsets[scPeriod] >= 0;
 }
 
-document.getElementById("sc-week-prev").addEventListener("click", () => { scWeekOffset -= 1; updateScWeekNav(); drawScCard(); });
-document.getElementById("sc-week-next").addEventListener("click", () => { if (scWeekOffset < 0) { scWeekOffset += 1; updateScWeekNav(); drawScCard(); } });
+document.getElementById("sc-week-prev").addEventListener("click", () => { if (scIsRecap()) { scOffsets[scPeriod] -= 1; updateScWeekNav(); drawScCard(); } });
+document.getElementById("sc-week-next").addEventListener("click", () => { if (scIsRecap() && scOffsets[scPeriod] < 0) { scOffsets[scPeriod] += 1; updateScWeekNav(); drawScCard(); } });
 
 function openShareCardModal(trade) {
   scTrade = trade;
   scPeriod = "trade";
-  scWeekOffset = 0;
+  scOffsets.week = scOffsets.month = scOffsets.year = 0;
   updateScWeekNav();
   document.querySelectorAll("#sc-period-tabs .sc-ptab").forEach(t => t.classList.toggle("active", t.dataset.period === "trade"));
   document.querySelectorAll("#sc-tabs .sc-tab").forEach((t, i) => t.classList.toggle("active", i === 0));

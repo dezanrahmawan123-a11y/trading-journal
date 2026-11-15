@@ -2224,3 +2224,8 @@ button, .csel-trigger, .tab-btn, .pill, a {
   .detail-modal .detail-actions #detail-close-btn { grid-column: 1 / 2; }
   .detail-modal .detail-actions #detail-edit-btn { grid-column: 2 / 4; }
 }
+
+@media (max-width: 780px) {
+  .sc-period-tabs { max-width: 100%; }
+  .sc-ptab { padding: 7px 11px; font-size: 12px; flex: 1; }
+}
