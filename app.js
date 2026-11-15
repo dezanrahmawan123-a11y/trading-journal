@@ -1792,6 +1792,7 @@ function scWkHeader(ctx, d, x, y, w) {
     ctx.fillText((d.name.trim().charAt(0) || "J").toUpperCase(), x + 30, y + 39);
   }
 
+  ctx.textAlign = "center";
   ctx.font = `700 17px Inter, sans-serif`;
   const pillText = d.range.toUpperCase();
   const pillW = ctx.measureText(pillText).width + 44;
