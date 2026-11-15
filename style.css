@@ -2203,3 +2203,24 @@ button, .csel-trigger, .tab-btn, .pill, a {
   .detail-actions { gap: 8px; }
   .detail-actions .btn { padding: 9px 8px; font-size: 12px; }
 }
+
+/* Mobile: tombol aksi detail trade jadi grid rapi */
+@media (max-width: 780px) {
+  .detail-modal .detail-actions {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 6px;
+  }
+  .detail-modal .detail-actions .btn {
+    flex: none !important;
+    width: 100%;
+    padding: 10px 6px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .detail-modal .detail-actions #detail-close-btn,
+  .detail-modal .detail-actions #detail-edit-btn { grid-column: span 1; }
+  .detail-modal .detail-actions #detail-close-btn { grid-column: 1 / 2; }
+  .detail-modal .detail-actions #detail-edit-btn { grid-column: 2 / 4; }
+}
