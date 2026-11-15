@@ -1791,11 +1791,14 @@ function getScWeekData() {
 }
 
 function scPanel(ctx, x, y, w, h, r) {
-  ctx.fillStyle = "rgba(0,0,0,0.30)";
+  const pg = ctx.createLinearGradient(0, y, 0, y + h);
+  pg.addColorStop(0, "rgba(255,255,255,0.10)");
+  pg.addColorStop(1, "rgba(0,0,0,0.34)");
+  ctx.fillStyle = pg;
   scRoundRectPath(ctx, x, y, w, h, r);
   ctx.fill();
-  ctx.strokeStyle = "rgba(255,255,255,0.16)";
-  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = "rgba(255,255,255,0.18)";
+  ctx.lineWidth = 1.2;
   scRoundRectPath(ctx, x, y, w, h, r);
   ctx.stroke();
 }
@@ -2008,6 +2011,95 @@ function scWkDaily(ctx, d, x, y, w, rowH) {
   return panelH;
 }
 
+function scFmtCompact(v, unit) {
+  const a2 = Math.abs(v);
+  const s2 = a2 >= 100 ? a2.toFixed(0) : (a2 >= 10 ? a2.toFixed(1).replace(/\.0$/, "") : a2.toFixed(1));
+  return (v < 0 ? "-" : "") + s2;
+}
+
+// Grafik kolom vertikal untuk recap bulanan (minggu) & tahunan (bulan)
+function scWkColumns(ctx, d, x, y, w, h) {
+  scPanel(ctx, x, y, w, h, 24);
+  const unitTag = d.unit === "r" ? "R" : (d.unit === "pct" ? "%" : "USD");
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  ctx.font = `800 17px Inter, sans-serif`;
+  ctx.fillText(d.meta.title, x + 32, y + 38);
+  ctx.textAlign = "right";
+  ctx.fillStyle = "rgba(255,255,255,0.4)";
+  ctx.font = `700 15px Inter, sans-serif`;
+  ctx.fillText(unitTag, x + w - 32, y + 38);
+
+  const n = d.days.length;
+  const padX = 30;
+  const slot = (w - padX * 2) / n;
+  const barW = Math.min(n > 6 ? slot * 0.56 : slot * 0.46, 92);
+  const topY = y + 84, labelY = y + h - 24;
+  const areaH = labelY - 30 - topY;
+  const hasNeg = d.days.some(day => day.count > 0 && day.value < 0);
+  const zeroY = hasNeg ? topY + areaH * 0.72 : topY + areaH;
+  const posH = zeroY - topY, negH = topY + areaH - zeroY;
+  const maxAbs = Math.max(1e-9, ...d.days.map(day => Math.abs(day.value)));
+  const valPx = n > 6 ? Math.max(11, Math.min(15, slot * 0.4)) : 19;
+  const lblPx = n > 6 ? Math.max(10, Math.min(15, slot * 0.38)) : 17;
+
+  // garis nol
+  ctx.strokeStyle = "rgba(255,255,255,0.16)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x + padX, zeroY + 0.5);
+  ctx.lineTo(x + w - padX, zeroY + 0.5);
+  ctx.stroke();
+
+  const bestVal = Math.max(...d.days.filter(day => day.count > 0).map(day => day.value), -Infinity);
+
+  d.days.forEach((day, i) => {
+    const cx = x + padX + slot * i + slot / 2;
+    const bx = cx - barW / 2;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+
+    if (day.count > 0) {
+      const isBest = day.value === bestVal && day.value > 0;
+      const mag = Math.abs(day.value) / maxAbs;
+      if (day.value >= 0) {
+        const bh = Math.max(6, mag * (posH - 26));
+        const g = ctx.createLinearGradient(0, zeroY - bh, 0, zeroY);
+        g.addColorStop(0, isBest ? "rgba(255,255,255,1)" : "rgba(255,255,255,0.9)");
+        g.addColorStop(1, "rgba(255,255,255,0.22)");
+        ctx.fillStyle = g;
+        scRoundRectPath(ctx, bx, zeroY - bh, barW, bh, Math.min(barW / 2, 10));
+        ctx.fill();
+        ctx.fillStyle = "#ffffff";
+        ctx.font = `800 ${valPx}px Manrope, sans-serif`;
+        ctx.fillText(n > 6 ? scFmtCompact(day.value, d.unit) : scFmtUnit(day.value, d.unit), cx, zeroY - bh - 9);
+      } else {
+        const bh = Math.max(6, mag * Math.max(8, negH - 26));
+        ctx.fillStyle = "rgba(255,255,255,0.3)";
+        scRoundRectPath(ctx, bx, zeroY, barW, bh, Math.min(barW / 2, 10));
+        ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,0.7)";
+        ctx.font = `800 ${valPx}px Manrope, sans-serif`;
+        ctx.fillText(n > 6 ? scFmtCompact(day.value, d.unit) : scFmtUnit(day.value, d.unit), cx, zeroY + bh + valPx + 6);
+      }
+    } else {
+      // placeholder titik kecil untuk periode kosong
+      ctx.fillStyle = "rgba(255,255,255,0.22)";
+      ctx.beginPath();
+      ctx.arc(cx, zeroY - 5, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = day.count > 0 ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.4)";
+    ctx.font = `700 ${lblPx}px Inter, sans-serif`;
+    const lbl = n > 6 ? day.label : day.label.replace("WEEK ", "WEEK ");
+    ctx.fillText(lbl, cx, labelY);
+  });
+  ctx.textAlign = "left";
+  return h;
+}
+
 function scWkCumulative(ctx, d, x, y, w, h) {
   scPanel(ctx, x, y, w, h, 24);
   const title = d.unit === "r" ? "CUMULATIVE R" : (d.unit === "pct" ? "CUMULATIVE %" : "CUMULATIVE P&L");
@@ -2067,9 +2159,10 @@ function scDrawWeekRecap(ctx, w, h) {
   if (tall) {
     const W = 800, pad = 44, cw = W - pad * 2;
     const segY = 130, netY = 171, chipsY = 343, boxesY = 405, dailyY = 525;
-    const rowT = n > 7 ? 44 : 62;
-    const dailyH = 62 + n * rowT + 18;
-    const cumY = dailyY + dailyH + 22, cumH = n > 7 ? 200 : 230;
+    const colMode = d.period !== "week";
+    const rowT = 62;
+    const dailyH = colMode ? 340 : 62 + n * rowT + 18;
+    const cumY = dailyY + dailyH + 22, cumH = 230;
     const footY = cumY + cumH + 44;
     const Hc = footY + 36;
     const k = Math.min(w / W, h / Hc);
@@ -2081,7 +2174,7 @@ function scDrawWeekRecap(ctx, w, h) {
     scWkNet(ctx, d, pad, netY, cw, 124);
     scWkChips(ctx, d, pad, chipsY);
     scWkStatBoxes(ctx, d, pad, boxesY, cw, 96);
-    scWkDaily(ctx, d, pad, dailyY, cw, rowT);
+    if (colMode) scWkColumns(ctx, d, pad, dailyY, cw, dailyH); else scWkDaily(ctx, d, pad, dailyY, cw, rowT);
     scWkCumulative(ctx, d, pad, cumY, cw, cumH);
     ctx.textAlign = "left";
     ctx.fillStyle = "rgba(255,255,255,0.6)";
@@ -2092,9 +2185,10 @@ function scDrawWeekRecap(ctx, w, h) {
   }
 
   const W = 1000, lx = 44, lw = 430, rx = 506, rw = 450;
-  const rowH = n > 7 ? 30 : (n <= 5 ? 48 : 40);
-  const dailyH = 56 + n * rowH + 14;
-  const cumY = 44 + dailyH + 18, cumH = n > 7 ? 170 : 200;
+  const colMode = d.period !== "week";
+  const rowH = n <= 5 ? 48 : 40;
+  const dailyH = colMode ? 270 : 56 + n * rowH + 14;
+  const cumY = 44 + dailyH + 18, cumH = colMode ? 190 : 200;
   const rightBottom = cumY + cumH;
   const footY = Math.max(527, rightBottom - 10);
   const Hc = footY + 44;
@@ -2107,7 +2201,7 @@ function scDrawWeekRecap(ctx, w, h) {
   scWkNet(ctx, d, lx, 171, lw, 96);
   scWkChips(ctx, d, lx, 323);
   scWkStatBoxes(ctx, d, lx, 385, lw, 92);
-  scWkDaily(ctx, d, rx, 44, rw, rowH);
+  if (colMode) scWkColumns(ctx, d, rx, 44, rw, dailyH); else scWkDaily(ctx, d, rx, 44, rw, rowH);
   scWkCumulative(ctx, d, rx, cumY, rw, cumH);
   ctx.textAlign = "left";
   ctx.fillStyle = "rgba(255,255,255,0.6)";
