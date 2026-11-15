@@ -2170,3 +2170,36 @@ button, .csel-trigger, .tab-btn, .pill, a {
 .account-photo-actions { display: flex; flex-direction: column; gap: 6px; }
 .account-photo-actions .btn { padding: 6px 12px; font-size: 12px; }
 .account-delete-btn { width: 100%; margin-top: 4px; color: #ff6b6b; border-color: rgba(255,107,107,.35); }
+
+/* ===== Mobile: detail / recap trade lebih ringkas ===== */
+@media (max-width: 780px) {
+  #trade-detail-overlay { padding: 12px 10px; align-items: center; }
+  .detail-modal {
+    padding: 16px 14px 14px;
+    max-height: calc(100dvh - 24px);
+    overflow-x: hidden;
+    box-shadow: none;
+  }
+  .detail-modal * { min-width: 0; max-width: 100%; box-sizing: border-box; }
+  .detail-header { margin-bottom: 12px; padding-bottom: 12px; gap: 10px; }
+  .detail-pair { font-size: 14px; }
+  .detail-date { font-size: 11px; }
+  .detail-header-left { gap: 4px; }
+  .detail-badges { flex-wrap: wrap; gap: 4px; }
+  .detail-badges * { font-size: 10.5px; padding: 3px 9px; }
+  .detail-pnl-label { font-size: 9px; margin-bottom: 2px; }
+  .detail-pnl-value { font-size: 17px; word-break: break-all; }
+  .detail-grid { gap: 8px; margin-bottom: 12px; }
+  .detail-stat { padding: 9px 11px; }
+  .detail-stat-label { font-size: 9px; margin-bottom: 3px; }
+  .detail-stat-value { font-size: 13px; }
+  .detail-section { margin-bottom: 12px; }
+  .detail-section-title { font-size: 9.5px; margin-bottom: 6px; }
+  .detail-tag { font-size: 10.5px; padding: 3px 9px; }
+  .detail-narrative { font-size: 12.5px; line-height: 1.5; }
+  .detail-empty-note { font-size: 12px; }
+  .detail-link-btn { font-size: 11px; padding: 6px 12px; }
+  .detail-screenshot { width: 72px; height: 72px; }
+  .detail-actions { gap: 8px; }
+  .detail-actions .btn { padding: 9px 8px; font-size: 12px; }
+}
