@@ -121,6 +121,7 @@
             <label>Akun Aktif</label>
             <select id="account-switcher"></select>
           </div>
+          <button class="btn btn-ghost hidden" id="account-edit-btn" style="margin-bottom:8px;">✏️ Edit / Foto Akun</button>
           <button class="btn btn-ghost" id="logout-btn">Keluar</button>
           <button class="btn btn-ghost hidden" id="admin-approval-btn" style="margin-top:8px;">🔐 Kelola User Baru</button>
         </div>
@@ -613,10 +614,18 @@
   <!-- ===================== MODAL TAMBAH AKUN ===================== -->
   <div id="account-modal-overlay" class="modal-overlay hidden">
     <div class="modal">
-      <h2>Tambah Akun Trading</h2>
+      <h2 id="account-modal-title">Tambah Akun Trading</h2>
       <p class="modal-desc" id="account-modal-desc">Bikin akun trading pertama lo. Bisa nambah akun lain lagi nanti (misal Akun Real & Akun Demo).</p>
       <div id="account-modal-error" class="error-msg hidden"></div>
       <form id="account-form">
+        <div class="account-photo-row">
+          <div class="account-photo-preview" id="account-photo-preview">👤</div>
+          <div class="account-photo-actions">
+            <button type="button" class="btn btn-ghost" id="account-photo-btn">Pasang Foto</button>
+            <button type="button" class="btn btn-ghost hidden" id="account-photo-remove">Hapus Foto</button>
+          </div>
+          <input type="file" id="account-photo-input" accept="image/*" hidden />
+        </div>
         <div class="field">
           <label>Nama Akun</label>
           <input type="text" id="account-name" required placeholder="Contoh: Akun Real, Backtest EURUSD" />
@@ -632,6 +641,7 @@
           <label>Modal Awal (Starting Balance)</label>
           <input type="number" step="any" id="account-balance" placeholder="Contoh: 1000" />
         </div>
+        <button type="button" class="btn btn-ghost account-delete-btn hidden" id="account-delete-btn">🗑 Hapus Akun</button>
         <div class="modal-actions">
           <button type="button" class="btn btn-ghost hidden" id="account-cancel-btn">Batal</button>
           <button type="submit" class="btn btn-primary" id="account-save-btn">Simpan</button>

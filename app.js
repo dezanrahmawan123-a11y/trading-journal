@@ -12,7 +12,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   getFirestore, collection, addDoc, updateDoc, deleteDoc,
-  doc, setDoc, onSnapshot, query, orderBy, serverTimestamp, deleteField
+  doc, setDoc, onSnapshot, query, orderBy, serverTimestamp, deleteField, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const app = initializeApp(firebaseConfig);
@@ -455,7 +455,79 @@ function renderAccountSwitcher() {
   addOpt.textContent = "+ Tambah Akun Baru";
   accountSwitcher.appendChild(addOpt);
   refreshCustomSelect(accountSwitcher);
+  updateProfileFab();
+  const editBtn = document.getElementById("account-edit-btn");
+  if (editBtn) editBtn.classList.toggle("hidden", !getCurrentAccount());
 }
+
+function updateProfileFab() {
+  const acc = getCurrentAccount();
+  if (acc && acc.photo) {
+    profileFabBtn.textContent = "";
+    profileFabBtn.style.backgroundImage = `url(${acc.photo})`;
+    profileFabBtn.classList.add("has-photo");
+  } else {
+    profileFabBtn.style.backgroundImage = "";
+    profileFabBtn.classList.remove("has-photo");
+    profileFabBtn.textContent = "👤";
+  }
+}
+
+// --- foto akun (disimpan sebagai data URL kecil di dokumen akun) ---
+let accountEditId = null;     // null = tambah baru, id = edit
+let accountPhotoDraft;        // undefined = tidak berubah, null = hapus, string = foto baru
+
+function setAccountPhotoPreview(src) {
+  const prev = document.getElementById("account-photo-preview");
+  prev.style.backgroundImage = src ? `url(${src})` : "";
+  prev.classList.toggle("has-photo", !!src);
+  prev.textContent = src ? "" : "👤";
+  document.getElementById("account-photo-remove").classList.toggle("hidden", !src);
+}
+
+function resizeImageToDataUrl(file, size = 256) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = c.height = size;
+      const cx = c.getContext("2d");
+      const side = Math.min(img.width, img.height);
+      cx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, size, size);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("bad image")); };
+    img.src = url;
+  });
+}
+
+document.getElementById("account-photo-btn").addEventListener("click", () =>
+  document.getElementById("account-photo-input").click());
+document.getElementById("account-photo-input").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  try {
+    accountPhotoDraft = await resizeImageToDataUrl(file);
+    setAccountPhotoPreview(accountPhotoDraft);
+  } catch {
+    accountModalError.textContent = "Gagal baca gambar. Coba file lain.";
+    accountModalError.classList.remove("hidden");
+  }
+});
+document.getElementById("account-photo-remove").addEventListener("click", () => {
+  accountPhotoDraft = null;
+  setAccountPhotoPreview(null);
+});
+
+document.getElementById("account-edit-btn").addEventListener("click", () => {
+  const acc = getCurrentAccount();
+  if (!acc) return;
+  document.getElementById("profile-menu").classList.add("hidden");
+  openAccountModal(false, acc);
+});
 
 accountSwitcher.addEventListener("change", () => {
   if (accountSwitcher.value === "__add__") {
@@ -469,18 +541,34 @@ accountSwitcher.addEventListener("change", () => {
   renderAll();
 });
 
-function openAccountModal(isFirst) {
+function openAccountModal(isFirst, editAcc = null) {
   accountForm.reset();
   accountModalError.classList.add("hidden");
   accountCancelBtn.classList.toggle("hidden", isFirst);
-  accountModalDesc.textContent = isFirst
-    ? "Bikin akun trading pertama lo. Bisa nambah akun lain lagi nanti (misal Akun Real & Akun Demo)."
-    : "Tambah akun trading baru. Trade akan dicatat terpisah per akun.";
+  accountEditId = editAcc ? editAcc.id : null;
+  accountPhotoDraft = undefined;
+  setAccountPhotoPreview(editAcc ? editAcc.photo : null);
+  document.getElementById("account-modal-title").textContent = editAcc ? "Edit Akun Trading" : "Tambah Akun Trading";
+  accountModalDesc.textContent = editAcc
+    ? "Ubah nama, foto, atau modal awal akun ini."
+    : isFirst
+      ? "Bikin akun trading pertama lo. Bisa nambah akun lain lagi nanti (misal Akun Real & Akun Demo)."
+      : "Tambah akun trading baru. Trade akan dicatat terpisah per akun.";
 
+  const type = editAcc ? editAcc.type : "live";
   document.querySelectorAll("#account-type-group .pill").forEach(p => p.classList.remove("active"));
-  document.querySelector('#account-type-group .pill[data-value="live"]').classList.add("active");
-  document.getElementById("account-balance-field").classList.remove("hidden");
-  document.getElementById("account-balance").required = true;
+  document.querySelector(`#account-type-group .pill[data-value="${type === "backtest" ? "backtest" : "live"}"]`).classList.add("active");
+  const isBt = type === "backtest";
+  document.getElementById("account-balance-field").classList.toggle("hidden", isBt);
+  document.getElementById("account-balance").required = !isBt;
+  if (editAcc) {
+    document.getElementById("account-name").value = editAcc.name || "";
+    document.getElementById("account-balance").value = isBt ? "" : (editAcc.startingBalance ?? "");
+  }
+  const delBtn = document.getElementById("account-delete-btn");
+  delBtn.classList.toggle("hidden", !editAcc || allAccounts.length <= 1);
+  delBtn.textContent = "🗑 Hapus Akun";
+  delBtn.dataset.confirm = "";
 
   accountModalOverlay.classList.remove("hidden");
 }
@@ -520,16 +608,62 @@ accountForm.addEventListener("submit", async (e) => {
   }
 
   try {
-    const ref = await addDoc(accountsCollection(currentUser.uid), {
-      name, type, startingBalance: balance || 0, createdAt: serverTimestamp()
-    });
-    currentAccountId = ref.id;
-    localStorage.setItem(`journal_account_${currentUser.uid}`, currentAccountId);
+    if (accountEditId) {
+      const upd = { name, type, startingBalance: balance || 0 };
+      if (accountPhotoDraft === null) upd.photo = deleteField();
+      else if (typeof accountPhotoDraft === "string") upd.photo = accountPhotoDraft;
+      await updateDoc(doc(db, "users", currentUser.uid, "accounts", accountEditId), upd);
+    } else {
+      const data = { name, type, startingBalance: balance || 0, createdAt: serverTimestamp() };
+      if (typeof accountPhotoDraft === "string") data.photo = accountPhotoDraft;
+      const ref = await addDoc(accountsCollection(currentUser.uid), data);
+      currentAccountId = ref.id;
+      localStorage.setItem(`journal_account_${currentUser.uid}`, currentAccountId);
+    }
     accountModalOverlay.classList.add("hidden");
   } catch (err) {
     accountModalError.textContent = "Gagal menyimpan akun. Coba lagi.";
     accountModalError.classList.remove("hidden");
     console.error(err);
+  }
+});
+
+document.getElementById("account-delete-btn").addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  if (!accountEditId || allAccounts.length <= 1) return;
+  if (btn.dataset.confirm !== "1") {
+    const n = allTrades.filter(t => t.accountId === accountEditId).length;
+    btn.dataset.confirm = "1";
+    btn.textContent = `Yakin? ${n} trade ikut kehapus — klik lagi`;
+    return;
+  }
+  btn.disabled = true;
+  try {
+    const uid = currentUser.uid;
+    const id = accountEditId;
+    const trades = allTrades.filter(t => t.accountId === id);
+    const refs = [];
+    trades.forEach(t => {
+      refs.push(doc(db, "users", uid, "trades", t.id));
+      if (t.shareId) refs.push(doc(db, "shared_trades", t.shareId));
+    });
+    refs.push(doc(db, "users", uid, "accounts", id));
+    for (let i = 0; i < refs.length; i += 400) {
+      const batch = writeBatch(db);
+      refs.slice(i, i + 400).forEach(r => batch.delete(r));
+      await batch.commit();
+    }
+    if (currentAccountId === id) {
+      currentAccountId = null;
+      try { localStorage.removeItem(`journal_account_${uid}`); } catch {}
+    }
+    accountModalOverlay.classList.add("hidden");
+  } catch (err) {
+    accountModalError.textContent = "Gagal hapus akun. Coba lagi.";
+    accountModalError.classList.remove("hidden");
+    console.error(err);
+  } finally {
+    btn.disabled = false;
   }
 });
 
@@ -1616,6 +1750,19 @@ function scPanel(ctx, x, y, w, h, r) {
   ctx.stroke();
 }
 
+let scPhotoCache = { src: null, img: null };
+function scAccountPhoto() {
+  const src = getCurrentAccount()?.photo || null;
+  if (!src) return null;
+  if (scPhotoCache.src !== src) {
+    const img = new Image();
+    img.onload = () => { if (scPhotoCache.img === img) drawScCard(); };
+    img.src = src;
+    scPhotoCache = { src, img };
+  }
+  return scPhotoCache.img.complete && scPhotoCache.img.naturalWidth ? scPhotoCache.img : null;
+}
+
 function scWkHeader(ctx, d, x, y, w) {
   ctx.textBaseline = "alphabetic";
   ctx.beginPath();
@@ -1625,10 +1772,25 @@ function scWkHeader(ctx, d, x, y, w) {
   ctx.strokeStyle = "rgba(255,255,255,0.4)";
   ctx.lineWidth = 2;
   ctx.stroke();
-  ctx.fillStyle = "#ffffff";
-  ctx.textAlign = "center";
-  ctx.font = `800 26px Manrope, sans-serif`;
-  ctx.fillText((d.name.trim().charAt(0) || "J").toUpperCase(), x + 30, y + 39);
+  const photo = scAccountPhoto();
+  if (photo) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x + 30, y + 30, 30, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(photo, x, y, 60, 60);
+    ctx.restore();
+    ctx.beginPath();
+    ctx.arc(x + 30, y + 30, 30, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(255,255,255,0.4)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.font = `800 26px Manrope, sans-serif`;
+    ctx.fillText((d.name.trim().charAt(0) || "J").toUpperCase(), x + 30, y + 39);
+  }
 
   ctx.font = `700 17px Inter, sans-serif`;
   const pillText = d.range.toUpperCase();

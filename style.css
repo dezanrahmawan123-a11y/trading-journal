@@ -2155,3 +2155,18 @@ button, .csel-trigger, .tab-btn, .pill, a {
 }
 .sc-week-nav button:disabled { opacity: .35; cursor: not-allowed; }
 .sc-week-nav span { min-width: 96px; text-align: center; }
+
+/* ===== Foto & hapus akun ===== */
+.profile-fab { background-size: cover; background-position: center; overflow: hidden; }
+.profile-fab.has-photo { font-size: 0; }
+.account-photo-row { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+.account-photo-preview {
+  width: 64px; height: 64px; border-radius: 50%; flex-shrink: 0;
+  background: var(--panel-2) center/cover no-repeat;
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center; font-size: 24px;
+}
+.account-photo-preview.has-photo { font-size: 0; }
+.account-photo-actions { display: flex; flex-direction: column; gap: 6px; }
+.account-photo-actions .btn { padding: 6px 12px; font-size: 12px; }
+.account-delete-btn { width: 100%; margin-top: 4px; color: #ff6b6b; border-color: rgba(255,107,107,.35); }
