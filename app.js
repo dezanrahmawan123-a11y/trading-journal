@@ -1309,6 +1309,7 @@ function getScCardData() {
       tag: [dirWord, scFmtDateTag(t.date)].filter(Boolean).join(" · "),
       direction: t.position === "Sell" ? -1 : 1,
       accountName: account?.name || "",
+      r: scTradeR(t, isBacktest),
       pnl: t.pnl || 0,
       pct: account?.startingBalance ? ((t.pnl || 0) / account.startingBalance) * 100 : null,
       stats: [
@@ -1332,6 +1333,7 @@ function getScCardData() {
     tag: periodLabel.toUpperCase(),
     direction: pnl >= 0 ? 1 : -1,
     accountName: "",
+    r: (() => { const rs = periodTrades.map(x => scTradeR(x, isBacktest)).filter(v => v !== null); return rs.length ? rs.reduce((a, b) => a + b, 0) : null; })(),
     pnl,
     pct: account?.startingBalance ? (pnl / account.startingBalance) * 100 : null,
     stats: [
@@ -1345,6 +1347,7 @@ function getScCardData() {
 
 function scFormatValue(data) {
   if (data.isBacktest) return formatPnl(data.pnl, true);
+  if (scFormat.show === "r" && data.r !== null && data.r !== undefined) return scFmtUnit(data.r, "r");
   if (scFormat.show === "percent" && data.pct !== null && data.pct !== undefined) {
     const sign = data.pct > 0 ? "+" : "";
     return `${sign}${data.pct.toFixed(2)}%`;
@@ -1521,7 +1524,379 @@ function scDrawFooter(ctx, data, w, h, s, L, padX) {
   ctx.textAlign = "left";
 }
 
+// ---- Weekly recap (layout khusus tab Weekly) ----
+let scWeekOffset = 0;
+const SC_DAY_LABELS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+
+function scMonthName(m) {
+  const n = SC_MONTHS[m] || "";
+  return n.charAt(0) + n.slice(1).toLowerCase();
+}
+
+function scLocalDateStr(d) {
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+// R per trade: akun backtest -> pnl sudah dalam R; akun live -> pnl dibagi risk ($) kalau risk diisi
+function scTradeR(t, isBacktest) {
+  if (isBacktest) return t.pnl || 0;
+  const risk = Number(t.risk);
+  return risk > 0 ? (t.pnl || 0) / risk : null;
+}
+
+function scFmtUnit(v, unit) {
+  const sign = v > 0 ? "+" : "";
+  if (unit === "r") return `${sign}${v.toFixed(2)}R`;
+  if (unit === "pct") return `${sign}${v.toFixed(2)}%`;
+  return `${sign}${formatMoney(v)}`;
+}
+
+function getScWeekData() {
+  const account = getCurrentAccount();
+  const isBacktest = account?.type === "backtest";
+  const startBal = account?.startingBalance || 0;
+  const unit = (isBacktest || scFormat.show === "r") ? "r"
+    : (scFormat.show === "percent" && startBal > 0 ? "pct" : "usd");
+
+  const base = new Date();
+  base.setDate(base.getDate() + scWeekOffset * 7);
+  const { monday } = getCurrentWeekRange(base);
+  const trades = getAccountTrades();
+
+  const buckets = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    buckets.push({ date: d, key: scLocalDateStr(d), pnl: 0, r: 0, count: 0, label: SC_DAY_LABELS[i] });
+  }
+  trades.forEach(t => {
+    const b = buckets.find(x => x.key === t.date);
+    if (!b) return;
+    b.count++;
+    b.pnl += t.pnl || 0;
+    const r = scTradeR(t, isBacktest);
+    if (r !== null) b.r += r;
+  });
+
+  const hasWeekend = buckets[5].count > 0 || buckets[6].count > 0;
+  const days = buckets.slice(0, hasWeekend ? 7 : 5).map(b => ({
+    ...b,
+    dateLabel: `${scMonthName(b.date.getMonth())} ${b.date.getDate()}`,
+    value: unit === "r" ? b.r : (unit === "pct" ? (b.pnl / startBal) * 100 : b.pnl),
+  }));
+
+  const traded = days.filter(x => x.count > 0);
+  const total = days.reduce((s2, x) => s2 + x.value, 0);
+  const green = traded.filter(x => x.value > 0).length;
+  const avg = traded.length ? total / traded.length : 0;
+  const best = traded.length ? Math.max(...traded.map(x => x.value)) : 0;
+  let cum = 0;
+  const cumSeries = [0];
+  days.forEach(x => { if (x.count > 0) { cum += x.value; cumSeries.push(cum); } });
+
+  const first = days[0].date, last = days[days.length - 1].date;
+  const range = first.getMonth() === last.getMonth()
+    ? `${scMonthName(first.getMonth())} ${first.getDate()}–${last.getDate()}`
+    : `${scMonthName(first.getMonth())} ${first.getDate()} – ${scMonthName(last.getMonth())} ${last.getDate()}`;
+
+  return {
+    unit, name: account?.name || "Jurnal Trading", days, sessions: traded.length,
+    green, total, avg, best, cumSeries, range,
+  };
+}
+
+function scPanel(ctx, x, y, w, h, r) {
+  ctx.fillStyle = "rgba(0,0,0,0.30)";
+  scRoundRectPath(ctx, x, y, w, h, r);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.16)";
+  ctx.lineWidth = 1.5;
+  scRoundRectPath(ctx, x, y, w, h, r);
+  ctx.stroke();
+}
+
+function scWkHeader(ctx, d, x, y, w) {
+  ctx.textBaseline = "alphabetic";
+  ctx.beginPath();
+  ctx.arc(x + 30, y + 30, 30, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(255,255,255,0.14)";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.4)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = "#ffffff";
+  ctx.textAlign = "center";
+  ctx.font = `800 26px Manrope, sans-serif`;
+  ctx.fillText((d.name.trim().charAt(0) || "J").toUpperCase(), x + 30, y + 39);
+
+  ctx.font = `700 17px Inter, sans-serif`;
+  const pillText = d.range.toUpperCase();
+  const pillW = ctx.measureText(pillText).width + 44;
+  const pillX = x + w - pillW;
+  ctx.fillStyle = "rgba(255,255,255,0.12)";
+  scRoundRectPath(ctx, pillX, y + 8, pillW, 44, 22);
+  ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  ctx.fillText(pillText, pillX + pillW / 2, y + 36);
+
+  ctx.textAlign = "left";
+  ctx.font = `800 30px Manrope, sans-serif`;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(scTruncate(ctx, d.name, w - 76 - pillW - 16), x + 76, y + 30);
+  ctx.font = `600 20px Inter, sans-serif`;
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  ctx.fillText("Weekly recap", x + 76, y + 58);
+}
+
+function scWkSegments(ctx, d, x, y, w) {
+  const n = d.days.length;
+  const gap = 14;
+  const segW = (w - gap * (n - 1)) / n;
+  d.days.forEach((day, i) => {
+    ctx.fillStyle = day.count > 0 ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.22)";
+    scRoundRectPath(ctx, x + i * (segW + gap), y, segW, 7, 3.5);
+    ctx.fill();
+  });
+}
+
+function scWkNet(ctx, d, x, y, w, maxPx) {
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  ctx.beginPath();
+  ctx.moveTo(x + 7, y + 4); ctx.lineTo(x + 14, y + 11); ctx.lineTo(x + 7, y + 18); ctx.lineTo(x, y + 11);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  ctx.font = `800 20px Inter, sans-serif`;
+  ctx.fillText("NET THIS WEEK", x + 28, y + 19);
+
+  const text = scFmtUnit(d.total, d.unit);
+  const px = Math.min(scFitPnlFont(ctx, text, w * 0.92, w), maxPx);
+  const baseline = y + 40 + px * 0.82;
+  scDrawPnlText(ctx, text, x, baseline, px, "left");
+  return baseline;
+}
+
+function scWkChips(ctx, d, x, y) {
+  const chips = [
+    { text: `${d.green} green day${d.green === 1 ? "" : "s"}`, strong: true },
+    { text: `${d.sessions} session${d.sessions === 1 ? "" : "s"}`, strong: false },
+  ];
+  ctx.textBaseline = "alphabetic";
+  ctx.textAlign = "left";
+  let cx = x;
+  chips.forEach(c => {
+    ctx.font = `700 18px Inter, sans-serif`;
+    const cw = ctx.measureText(c.text).width + 36;
+    ctx.fillStyle = c.strong ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.11)";
+    scRoundRectPath(ctx, cx, y, cw, 38, 19);
+    ctx.fill();
+    ctx.fillStyle = c.strong ? "#ffffff" : "rgba(255,255,255,0.7)";
+    ctx.fillText(c.text, cx + 18, y + 25);
+    cx += cw + 12;
+  });
+}
+
+function scWkStatBoxes(ctx, d, x, y, w, h) {
+  const items = [
+    { value: `${d.green} / ${d.sessions}`, label: "green days" },
+    { value: d.sessions ? scFmtUnit(d.avg, d.unit) : "–", label: "avg per day" },
+    { value: d.sessions ? scFmtUnit(d.best, d.unit) : "–", label: "best day" },
+  ];
+  const gap = 14;
+  const bw = (w - gap * 2) / 3;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  items.forEach((it, i) => {
+    const bx = x + i * (bw + gap);
+    scPanel(ctx, bx, y, bw, h, 18);
+    let px = 30;
+    ctx.font = `800 ${px}px Manrope, sans-serif`;
+    while (ctx.measureText(it.value).width > bw - 20 && px > 14) {
+      px -= 1;
+      ctx.font = `800 ${px}px Manrope, sans-serif`;
+    }
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(it.value, bx + bw / 2, y + h * 0.48);
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.font = `600 17px Inter, sans-serif`;
+    ctx.fillText(it.label, bx + bw / 2, y + h * 0.78);
+  });
+  ctx.textAlign = "left";
+}
+
+function scWkDaily(ctx, d, x, y, w, rowH) {
+  const f = Math.max(0.7, Math.min(1, rowH / 62));
+  const headH = 56 * (f < 1 ? 1 : 1.1);
+  const panelH = headH + d.days.length * rowH + 14;
+  scPanel(ctx, x, y, w, panelH, 24);
+
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  ctx.font = `800 17px Inter, sans-serif`;
+  ctx.fillText("DAILY RESULT", x + 32, y + 36);
+
+  const maxAbs = Math.max(1e-9, ...d.days.map(day => Math.abs(day.value)));
+  const trackX = x + 150 * f + 10;
+  const trackW = w - (150 * f + 10) - 130 * f - 28;
+  const barH = 26 * f;
+
+  d.days.forEach((day, i) => {
+    const ry = y + headH + i * rowH;
+    const midY = ry + rowH / 2;
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `800 ${24 * f}px Manrope, sans-serif`;
+    ctx.fillText(day.label, x + 32, midY - 2 * f);
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.font = `600 ${16 * f}px Inter, sans-serif`;
+    ctx.fillText(day.dateLabel, x + 32, midY + 18 * f);
+
+    if (day.count > 0) {
+      ctx.fillStyle = "rgba(255,255,255,0.14)";
+      scRoundRectPath(ctx, trackX, midY - barH / 2, trackW, barH, barH / 2);
+      ctx.fill();
+      const len = Math.max(barH, (Math.abs(day.value) / maxAbs) * trackW);
+      if (day.value >= 0) {
+        const g = ctx.createLinearGradient(trackX, 0, trackX + len, 0);
+        g.addColorStop(0, "rgba(255,255,255,0.55)");
+        g.addColorStop(1, "rgba(255,255,255,0.98)");
+        ctx.fillStyle = g;
+      } else {
+        ctx.fillStyle = "rgba(255,255,255,0.32)";
+      }
+      scRoundRectPath(ctx, trackX, midY - barH / 2, len, barH, barH / 2);
+      ctx.fill();
+    } else {
+      ctx.setLineDash([8, 7]);
+      ctx.strokeStyle = "rgba(255,255,255,0.28)";
+      ctx.lineWidth = 1.6;
+      scRoundRectPath(ctx, trackX, midY - barH / 2, trackW, barH, barH / 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    ctx.textAlign = "right";
+    ctx.fillStyle = day.count > 0 ? "#ffffff" : "rgba(255,255,255,0.4)";
+    ctx.font = `800 ${21 * f}px Manrope, sans-serif`;
+    ctx.fillText(day.count > 0 ? scFmtUnit(day.value, d.unit) : "–", x + w - 32, midY + 7 * f);
+  });
+  ctx.textAlign = "left";
+  return panelH;
+}
+
+function scWkCumulative(ctx, d, x, y, w, h) {
+  scPanel(ctx, x, y, w, h, 24);
+  const title = d.unit === "r" ? "CUMULATIVE R" : (d.unit === "pct" ? "CUMULATIVE %" : "CUMULATIVE P&L");
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  ctx.font = `800 17px Inter, sans-serif`;
+  ctx.fillText(title, x + 32, y + 36);
+
+  const cx0 = x + 44, cx1 = x + w - 44;
+  const cy0 = y + 70, cy1 = y + h - 34;
+  const series = d.cumSeries;
+  const min = Math.min(0, ...series), max = Math.max(0, ...series);
+  const range = (max - min) || 1;
+  const pts = series.map((v, i) => ({
+    x: series.length === 1 ? cx0 : cx0 + (i * (cx1 - cx0)) / (series.length - 1),
+    y: series.length === 1 || max === min ? (cy0 + cy1) / 2 : cy1 - ((v - min) / range) * (cy1 - cy0),
+  }));
+  if (pts.length === 1) pts.push({ x: cx1, y: pts[0].y });
+
+  ctx.beginPath();
+  pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+  ctx.lineTo(pts[pts.length - 1].x, cy1);
+  ctx.lineTo(pts[0].x, cy1);
+  ctx.closePath();
+  const g = ctx.createLinearGradient(0, cy0, 0, cy1);
+  g.addColorStop(0, "rgba(255,255,255,0.26)");
+  g.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = g;
+  ctx.fill();
+
+  ctx.beginPath();
+  pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+  ctx.strokeStyle = "rgba(255,255,255,0.95)";
+  ctx.lineWidth = 4;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.stroke();
+
+  [pts[0], pts[pts.length - 1]].forEach(p => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.fill();
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 3.5;
+    ctx.stroke();
+  });
+}
+
+function scDrawWeekRecap(ctx, w, h) {
+  const d = getScWeekData();
+  const n = d.days.length;
+  const tall = h / w >= 1.15;
+  ctx.textAlign = "left";
+
+  if (tall) {
+    const W = 800, pad = 44, cw = W - pad * 2;
+    const segY = 130, netY = 171, chipsY = 343, boxesY = 405, dailyY = 525;
+    const dailyH = 62 + n * 62 + 18;
+    const cumY = dailyY + dailyH + 22, cumH = 230;
+    const footY = cumY + cumH + 44;
+    const Hc = footY + 36;
+    const k = Math.min(w / W, h / Hc);
+    ctx.save();
+    ctx.translate((w - W * k) / 2, (h - Hc * k) / 2);
+    ctx.scale(k, k);
+    scWkHeader(ctx, d, pad, 44, cw);
+    scWkSegments(ctx, d, pad, segY, cw);
+    scWkNet(ctx, d, pad, netY, cw, 124);
+    scWkChips(ctx, d, pad, chipsY);
+    scWkStatBoxes(ctx, d, pad, boxesY, cw, 96);
+    scWkDaily(ctx, d, pad, dailyY, cw, 62);
+    scWkCumulative(ctx, d, pad, cumY, cw, cumH);
+    ctx.textAlign = "left";
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.font = `700 20px Inter, sans-serif`;
+    ctx.fillText(d.range, pad + 6, footY);
+    ctx.restore();
+    return;
+  }
+
+  const W = 1000, lx = 44, lw = 430, rx = 506, rw = 450;
+  const rowH = n <= 5 ? 48 : 40;
+  const dailyH = 56 + n * rowH + 14;
+  const cumY = 44 + dailyH + 18, cumH = 200;
+  const rightBottom = cumY + cumH;
+  const footY = Math.max(527, rightBottom - 10);
+  const Hc = footY + 44;
+  const k = Math.min(w / W, h / Hc);
+  ctx.save();
+  ctx.translate((w - W * k) / 2, (h - Hc * k) / 2);
+  ctx.scale(k, k);
+  scWkHeader(ctx, d, lx, 44, lw);
+  scWkSegments(ctx, d, lx, 130, lw);
+  scWkNet(ctx, d, lx, 171, lw, 96);
+  scWkChips(ctx, d, lx, 323);
+  scWkStatBoxes(ctx, d, lx, 385, lw, 92);
+  scWkDaily(ctx, d, rx, 44, rw, rowH);
+  scWkCumulative(ctx, d, rx, cumY, rw, cumH);
+  ctx.textAlign = "left";
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  ctx.font = `700 20px Inter, sans-serif`;
+  ctx.fillText(d.range, lx + 6, footY);
+  ctx.restore();
+}
+
 function scDrawCardContent(ctx, w, h, s) {
+  if (scPeriod === "week") { scDrawWeekRecap(ctx, w, h); return; }
   const data = getScCardData();
   const L = SC_LAYOUTS[scFormat.size] || SC_LAYOUTS.square;
   const left = L.align === "left";
@@ -1804,6 +2179,7 @@ document.querySelectorAll("#sc-period-tabs .sc-ptab").forEach(tab => {
     document.querySelectorAll("#sc-period-tabs .sc-ptab").forEach(t => t.classList.remove("active"));
     tab.classList.add("active");
     scPeriod = tab.dataset.period;
+    updateScWeekNav();
     drawScCard();
   });
 });
@@ -1815,6 +2191,7 @@ document.querySelectorAll("#sc-panel-format .sc-pill-group").forEach(group => {
       group.querySelectorAll(".sc-pill").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       scFormat[key] = btn.dataset.value;
+      updateScWeekNav();
       drawScCard();
     });
   });
@@ -1982,9 +2359,22 @@ async function scExportGif() {
 }
 scExportGifBtn.addEventListener("click", scExportGif);
 
+function updateScWeekNav() {
+  const nav = document.getElementById("sc-week-nav");
+  if (!nav) return;
+  nav.classList.toggle("hidden", scPeriod !== "week");
+  if (scPeriod === "week") document.getElementById("sc-week-label").textContent = getScWeekData().range;
+  document.getElementById("sc-week-next").disabled = scWeekOffset >= 0;
+}
+
+document.getElementById("sc-week-prev").addEventListener("click", () => { scWeekOffset -= 1; updateScWeekNav(); drawScCard(); });
+document.getElementById("sc-week-next").addEventListener("click", () => { if (scWeekOffset < 0) { scWeekOffset += 1; updateScWeekNav(); drawScCard(); } });
+
 function openShareCardModal(trade) {
   scTrade = trade;
   scPeriod = "trade";
+  scWeekOffset = 0;
+  updateScWeekNav();
   document.querySelectorAll("#sc-period-tabs .sc-ptab").forEach(t => t.classList.toggle("active", t.dataset.period === "trade"));
   document.querySelectorAll("#sc-tabs .sc-tab").forEach((t, i) => t.classList.toggle("active", i === 0));
   document.getElementById("sc-panel-background").classList.remove("hidden");

@@ -720,6 +720,12 @@
         <button type="button" class="sc-ptab" data-period="month">Monthly</button>
       </div>
 
+      <div class="sc-week-nav hidden" id="sc-week-nav">
+        <button type="button" id="sc-week-prev" title="Minggu sebelumnya">‹</button>
+        <span id="sc-week-label"></span>
+        <button type="button" id="sc-week-next" title="Minggu berikutnya">›</button>
+      </div>
+
       <div class="sc-body">
         <div class="sc-preview-wrap">
           <canvas id="sc-canvas" width="800" height="800"></canvas>
@@ -776,6 +782,7 @@
               <div class="sc-pill-group" data-key="show">
                 <button type="button" class="sc-pill active" data-value="amount">$</button>
                 <button type="button" class="sc-pill" data-value="percent">%</button>
+                <button type="button" class="sc-pill" data-value="r">R</button>
               </div>
             </div>
             <div class="sc-field">
